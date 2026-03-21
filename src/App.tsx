@@ -61,6 +61,21 @@ function formatCountdown(ms: number): string {
   return `${Math.ceil(ms / 1000)} s`;
 }
 
+function formatCompactTimestamp(value: number | string | undefined): string {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(date);
+}
+
+function getServerLoadPercent(server: ExporterServerSnapshot): number {
+  if (!server.maxPlayers) return 0;
+  return Math.max(0, Math.min(100, Math.round((server.playerCount / server.maxPlayers) * 100)));
+}
+
 function canUseRedirectSequenceTarget(server: ExporterServerSnapshot | undefined): boolean {
   return Boolean(server?.online && server.joinLink);
 }
@@ -151,9 +166,6 @@ export default function App({ config }: AppProps) {
 
   const testSequenceDelayMs = Math.max(0, config.app.testSequenceDelayMs || 0);
   const testSequencePlanLabel = config.app.testSequenceServerIds?.join(' -> ') || '—';
-  const connectorWindowReady = Boolean(
-    connectorWindowRef.current && !connectorWindowRef.current.closed
-  );
 
   const clearPendingSequence = () => {
     if (sequenceTimerRef.current) {
@@ -391,132 +403,101 @@ export default function App({ config }: AppProps) {
   const nextFollowupCountdown = pendingSequence
     ? Math.max(0, pendingSequence.nextRedirectAt - now)
     : 0;
+  const productionMode = !config.app.testSequenceServerIds?.length;
+  const liveServerCount = snapshot.servers.filter((server) => server.online).length;
+  const healthyExporterCount = Math.max(0, config.exporters.length - snapshot.errors.length);
+  const latestLog = logs[logs.length - 1] || 'Событий пока нет.';
 
   return (
     <div className="shell">
       <header className="hero">
-        <div>
-          <p className="eyebrow">Squad Static Autoconnect</p>
+        <div className="hero-main">
+          <p className="eyebrow">BSS Seed Connect</p>
           <h1>{config.app.title}</h1>
           <p className="hero-copy">
-            Статическая страница на GitHub Pages читает публичный snapshot exporter-а и, если по
-            общему правилу найден целевой seed-сервер, делает redirect через `steam://`.
+            Публичный snapshot SquadJS exporter-а, автоматический выбор seed-сервера и redirect в
+            Squad через Steam.
           </p>
-        </div>
-        <div className="hero-side">
-          <div className="stat-card">
-            <span>Состояние</span>
-            <strong>{enabled ? 'Включён' : 'Выключен'}</strong>
+          <div className="hero-badges">
+            <span className={classNames('status-pill', enabled ? 'status-good' : 'status-muted')}>
+              {enabled ? 'Автоконнектор включён' : 'Автоконнектор выключен'}
+            </span>
+            <span
+              className={classNames(
+                'status-pill',
+                permissionsReady ? 'status-good' : 'status-danger'
+              )}
+            >
+              {permissionsReady ? 'Браузер готов' : 'Нужна проверка браузера'}
+            </span>
+            <span
+              className={classNames(
+                'status-pill',
+                displayTargetServer ? 'status-good' : 'status-danger'
+              )}
+            >
+              {displayTargetServer ? statusText : 'Цель не выбрана'}
+            </span>
+            <span className="status-pill status-accent">
+              {productionMode ? 'Боевой режим' : `Тест ${testSequencePlanLabel}`}
+            </span>
           </div>
+        </div>
+        <div className="hero-side hero-metrics">
           <div className="stat-card">
-            <span>Target</span>
+            <span>Текущая цель</span>
             <strong>{displayTargetServer?.name || 'Нет подходящего сервера'}</strong>
+          </div>
+          <div className="metric-row">
+            <div className="stat-card stat-card-compact">
+              <span>Серверы</span>
+              <strong>
+                {liveServerCount}/{snapshot.servers.length || config.exporters.length}
+              </strong>
+            </div>
+            <div className="stat-card stat-card-compact">
+              <span>Exporter</span>
+              <strong>
+                {healthyExporterCount}/{config.exporters.length}
+              </strong>
+            </div>
+            <div className="stat-card stat-card-compact">
+              <span>Snapshot</span>
+              <strong>{formatCompactTimestamp(snapshot.generatedAt)}</strong>
+            </div>
+            <div className="stat-card stat-card-compact">
+              <span>{pendingSequence ? 'Follow-up' : 'Cooldown'}</span>
+              <strong>
+                {pendingSequence
+                  ? formatCountdown(nextFollowupCountdown)
+                  : cooldownLeftMs > 0
+                    ? formatCountdown(cooldownLeftMs)
+                    : '—'}
+              </strong>
+            </div>
           </div>
         </div>
       </header>
 
-      <main className="dashboard-grid" style={{ marginTop: 20 }}>
-        <section className="panel">
-          <div className="panel-header">
-            <h2>Как это работает</h2>
-            <span className="badge">{statusText}</span>
-          </div>
-          <p className="panel-copy">
-            Это не персональный автосидер. Система не знает пользователя, не использует Steam auth
-            и не отслеживает presence. Решение о подключении принимается только по публичному
-            snapshot со списком серверов.
-          </p>
-          <dl className="keyvals">
-            <div>
-              <dt>Последний snapshot</dt>
-              <dd>{formatTimestamp(snapshot.generatedAt)}</dd>
-            </div>
-            <div>
-              <dt>Режим</dt>
-              <dd>
-                {config.app.testSequenceServerIds?.length
-                  ? 'Тестовая последовательность'
-                  : selection?.nightMode
-                    ? 'Ночной'
-                    : 'Дневной'}
-              </dd>
-            </div>
-            <div>
-              <dt>Exporter endpoints</dt>
-              <dd>{config.exporters.length}</dd>
-            </div>
-            <div>
-              <dt>Target joinLink</dt>
-              <dd>{displayTargetServer?.joinLink || '—'}</dd>
-            </div>
-            <div>
-              <dt>Follow-up</dt>
-              <dd>{nextFollowupServer?.name || '—'}</dd>
-            </div>
-          </dl>
+      {(fatalError || snapshot.errors.length) && (
+        <section className="alert-strip">
+          {fatalError ? <p>{fatalError}</p> : null}
+          {snapshot.errors.map((error) => (
+            <p key={error}>{error}</p>
+          ))}
         </section>
+      )}
 
-        <section className="panel">
-          <div className="panel-header">
-            <h2>Permissions</h2>
-            <span className="badge">{permissionsReady ? 'Ready' : permissions ? 'Частично готовы' : 'Не проверены'}</span>
-          </div>
-          <p className="panel-copy">
-            Перед запуском нужно один раз явно проверить popup и тестовый вызов `steam://`.
-            Проверка popup может кратко открыть и сразу закрыть служебное окно браузера.
-          </p>
-          <div className="actions">
-            <button className="button button-primary" onClick={() => void handlePermissionsCheck()}>
-              Проверить permissions
-            </button>
-          </div>
-          <dl className="keyvals">
-            <div>
-              <dt>Popup</dt>
-              <dd>{permissions ? formatBool(permissions.popupAllowed) : '—'}</dd>
-            </div>
-            <div>
-              <dt>Steam protocol</dt>
-              <dd>{permissions ? formatBool(permissions.steamProtocolReady) : '—'}</dd>
-            </div>
-            <div>
-              <dt>Checked at</dt>
-              <dd>{permissions ? formatTimestamp(permissions.checkedAt) : '—'}</dd>
-            </div>
-          </dl>
-          <div className="preflight-box">
-            <h3>Локальный preflight-check</h3>
-            <div className="preflight-item">
-              <span className={classNames('preflight-dot', permissions?.popupAllowed && 'preflight-dot-ready')} />
-              <div>
-                <strong>Всплывающие окна разрешены</strong>
-                <p>Страница может инициировать переход и тестовое открытие Steam.</p>
-              </div>
-            </div>
-            <div className="preflight-item">
-              <span className={classNames('preflight-dot', permissions?.steamProtocolReady && 'preflight-dot-ready')} />
-              <div>
-                <strong>Тестовый вызов Steam не был заблокирован</strong>
-                <p>Страница получила явный сигнал, что браузер не отклонил тестовый вызов `steam://`.</p>
-              </div>
-            </div>
-            <div className="preflight-item">
-              <span className={classNames('preflight-dot', permissionsReady && 'preflight-dot-attention')} />
-              <div>
-                <strong>Оставьте Squad включённым в главном меню</strong>
-                <p>
-                  Когда обе локальные проверки пройдены, технически всё готово. Дальше от пользователя
-                  нужно только держать Steam и Squad запущенными, а Squad оставить в главном меню.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="panel">
+      <main className="dashboard-grid compact-grid" style={{ marginTop: 20 }}>
+        <section className="panel panel-span">
           <div className="panel-header">
             <h2>Управление</h2>
-            <span className="badge">
+            <span
+              className={classNames(
+                'badge',
+                pendingSequence ? 'badge-warn' : enabled ? 'badge-live' : 'badge-muted'
+              )}
+            >
               {pendingSequence
                 ? `Follow-up через ${formatCountdown(nextFollowupCountdown)}`
                 : isFetching
@@ -533,148 +514,229 @@ export default function App({ config }: AppProps) {
             >
               {enabled ? 'Выключить автоконнектор' : 'Включить автоконнектор'}
             </button>
+            <button className="button button-primary" onClick={() => void handlePermissionsCheck()}>
+              Проверить браузер
+            </button>
             <button className="button" onClick={() => void refreshSnapshot()}>
               Обновить сейчас
             </button>
           </div>
-          <dl className="keyvals">
-            <div>
-              <dt>Polling interval</dt>
-              <dd>{Math.round(config.app.pollIntervalMs / 1000)} s</dd>
+          <div className="signal-grid">
+            <div className="signal-card">
+              <span
+                className={classNames(
+                  'signal-dot',
+                  permissions?.popupAllowed ? 'signal-dot-good' : 'signal-dot-bad'
+                )}
+              />
+              <div>
+                <strong>Popup</strong>
+                <p>{permissions?.popupAllowed ? 'Разрешены' : 'Не подтверждены'}</p>
+              </div>
             </div>
-            <div>
-              <dt>Cooldown</dt>
-              <dd>{cooldownLeftMs > 0 ? `${Math.ceil(cooldownLeftMs / 1000)} s` : 'Не активен'}</dd>
+            <div className="signal-card">
+              <span
+                className={classNames(
+                  'signal-dot',
+                  permissions?.steamProtocolReady ? 'signal-dot-good' : 'signal-dot-bad'
+                )}
+              />
+              <div>
+                <strong>Steam protocol</strong>
+                <p>{permissions?.steamProtocolReady ? 'Готов' : 'Не подтверждён'}</p>
+              </div>
             </div>
-            <div>
-              <dt>lastProcessedTimestamp</dt>
-              <dd>{lastProcessedTimestamp || '—'}</dd>
+            <div className="signal-card">
+              <span
+                className={classNames(
+                  'signal-dot',
+                  healthyExporterCount === config.exporters.length
+                    ? 'signal-dot-good'
+                    : 'signal-dot-warn'
+                )}
+              />
+              <div>
+                <strong>Exporter</strong>
+                <p>
+                  {healthyExporterCount}/{config.exporters.length} доступны
+                </p>
+              </div>
             </div>
-            <div>
-              <dt>Служебное окно</dt>
-              <dd>{connectorWindowReady ? 'Готово' : 'Не подготовлено'}</dd>
+            <div className="signal-card">
+              <span
+                className={classNames(
+                  'signal-dot',
+                  displayTargetServer ? 'signal-dot-good' : 'signal-dot-bad'
+                )}
+              />
+              <div>
+                <strong>Target</strong>
+                <p>{displayTargetServer ? 'Найден' : 'Не найден'}</p>
+              </div>
             </div>
-            <div>
-              <dt>Тестовый план</dt>
-              <dd>{config.app.testSequenceServerIds?.length ? testSequencePlanLabel : 'Выключен'}</dd>
-            </div>
-          </dl>
-          {fatalError ? <p className="error-text">{fatalError}</p> : null}
+          </div>
+          <p className="panel-note">
+            После проверки браузера оставь Steam и Squad запущенными, а сам Squad держи в главном
+            меню.
+          </p>
         </section>
 
         <section className="panel">
           <div className="panel-header">
-            <h2>Правила выбора</h2>
-            <span className="badge">{selection?.nightMode ? 'Night window' : 'Priority mode'}</span>
+            <h2>Правила</h2>
+            <span className={classNames('badge', productionMode ? 'badge-live' : 'badge-warn')}>
+              {productionMode ? 'Боевой режим' : `Тест ${testSequencePlanLabel}`}
+            </span>
           </div>
-          <dl className="keyvals">
-            <div>
-              <dt>Timezone</dt>
-              <dd>{effectivePolicy.timezone}</dd>
+          <div className="rule-grid">
+            <div className="rule-card">
+              <span>Приоритет</span>
+              <strong>{effectivePolicy.priorityOrder.join(' → ')}</strong>
             </div>
-            <div>
-              <dt>Night window</dt>
-              <dd>
+            <div className="rule-card">
+              <span>Ночь</span>
+              <strong>
                 {effectivePolicy.nightWindowStart} - {effectivePolicy.nightWindowEnd}
-              </dd>
+              </strong>
             </div>
-            <div>
-              <dt>Night preferred server</dt>
-              <dd>{effectivePolicy.nightPreferredServerId}</dd>
+            <div className="rule-card">
+              <span>Ночной target</span>
+              <strong>{effectivePolicy.nightPreferredServerId}</strong>
             </div>
-            <div>
-              <dt>Priority order</dt>
-              <dd>{effectivePolicy.priorityOrder.join(' -> ')}</dd>
+            <div className="rule-card">
+              <span>Лимит seed</span>
+              <strong>&lt; {effectivePolicy.maxSeedPlayers}</strong>
             </div>
-            <div>
-              <dt>Max seed players</dt>
-              <dd>{effectivePolicy.maxSeedPlayers}</dd>
+            <div className="rule-card">
+              <span>Switch delta</span>
+              <strong>&gt; {effectivePolicy.switchDelta}</strong>
             </div>
-            <div>
-              <dt>switchDelta</dt>
-              <dd>{effectivePolicy.switchDelta}</dd>
+            <div className="rule-card">
+              <span>Polling</span>
+              <strong>{Math.round(config.app.pollIntervalMs / 1000)} s</strong>
             </div>
-          </dl>
+          </div>
+        </section>
+
+        <section className="panel">
+          <div className="panel-header">
+            <h2>Состояние</h2>
+            <span
+              className={classNames(
+                'badge',
+                selection?.nightMode ? 'badge-warn' : 'badge-muted'
+              )}
+            >
+              {selection?.nightMode ? 'Ночной режим' : 'Дневной режим'}
+            </span>
+          </div>
+          <div className="summary-stack">
+            <div className="summary-row">
+              <span>Последний snapshot</span>
+              <strong>{formatTimestamp(snapshot.generatedAt)}</strong>
+            </div>
+            <div className="summary-row">
+              <span>Последняя проверка браузера</span>
+              <strong>{permissions ? formatTimestamp(permissions.checkedAt) : '—'}</strong>
+            </div>
+            <div className="summary-row">
+              <span>Cooldown</span>
+              <strong>{cooldownLeftMs > 0 ? formatCountdown(cooldownLeftMs) : 'Не активен'}</strong>
+            </div>
+            {pendingSequence ? (
+              <div className="summary-row">
+                <span>Следующий redirect</span>
+                <strong>{nextFollowupServer?.name || '—'}</strong>
+              </div>
+            ) : null}
+            <div className="summary-row summary-row-log">
+              <span>Последнее событие</span>
+              <strong>{latestLog}</strong>
+            </div>
+          </div>
         </section>
 
         <section className="panel panel-span">
           <div className="panel-header">
-            <h2>Серверы из snapshot</h2>
-            <span className="badge">{snapshot.servers.length} servers</span>
+            <h2>Серверы</h2>
+            <span className="badge badge-live">{snapshot.servers.length}</span>
           </div>
-          {snapshot.errors.length ? (
-            <div style={{ marginBottom: 16 }}>
-              {snapshot.errors.map((error) => (
-                <p key={error} className="error-text">
-                  {error}
-                </p>
-              ))}
-            </div>
-          ) : null}
           <div className="server-grid">
             {snapshot.servers.map((server: ExporterServerSnapshot) => (
               <article
                 key={`${server.sourceUrl}-${server.id}-${server.code}`}
-                className={classNames('server-card', server.online && 'server-card-live')}
+                className={classNames(
+                  'server-card',
+                  server.online && 'server-card-live',
+                  displayTargetServer?.id === server.id && 'server-card-target'
+                )}
               >
-                <div className="server-card-head">
-                  <h3>{server.name}</h3>
-                  <span
-                    className={classNames(
-                      'server-state',
-                      server.online ? 'state-live' : 'state-dead'
-                    )}
-                  >
-                    {server.online ? 'online' : 'offline'}
-                  </span>
+                <div className="server-card-head compact-head">
+                  <div>
+                    <h3>{server.name}</h3>
+                    <p className="server-subline">{server.code}</p>
+                  </div>
+                  <div className="server-chip-row">
+                    <span
+                      className={classNames(
+                        'server-state',
+                        server.online ? 'state-live' : 'state-dead'
+                      )}
+                    >
+                      {server.online ? 'online' : 'offline'}
+                    </span>
+                    <span
+                      className={classNames(
+                        'server-state',
+                        server.isSeedCandidate ? 'state-live' : 'state-dead'
+                      )}
+                    >
+                      seed
+                    </span>
+                    {displayTargetServer?.id === server.id ? (
+                      <span className="server-state state-target">target</span>
+                    ) : null}
+                  </div>
                 </div>
-                <dl className="keyvals">
-                  <div>
-                    <dt>Игроки</dt>
-                    <dd>
-                      {server.playerCount}/{server.maxPlayers || '—'}
-                    </dd>
+                <div className="server-load">
+                  <div className="server-load-main">
+                    <strong>{server.playerCount}</strong>
+                    <span>/{server.maxPlayers || '—'}</span>
                   </div>
-                  <div>
-                    <dt>Queue</dt>
-                    <dd>{server.queueLength || 0}</dd>
+                  <em>{getServerLoadPercent(server)}%</em>
+                </div>
+                <div className="server-meter">
+                  <span style={{ width: `${getServerLoadPercent(server)}%` }} />
+                </div>
+                <div className="server-facts">
+                  <div className="fact-pill">
+                    <span>Очередь</span>
+                    <strong>{server.queueLength || 0}</strong>
                   </div>
-                  <div>
-                    <dt>Layer</dt>
-                    <dd>{server.currentLayer || '—'}</dd>
+                  <div className="fact-pill">
+                    <span>Слой</span>
+                    <strong>{server.currentLayer || '—'}</strong>
                   </div>
-                  <div>
-                    <dt>Mode</dt>
-                    <dd>{server.gameMode || '—'}</dd>
+                  <div className="fact-pill">
+                    <span>Режим</span>
+                    <strong>{server.gameMode || '—'}</strong>
                   </div>
-                  <div>
-                    <dt>Seed candidate</dt>
-                    <dd>{formatBool(server.isSeedCandidate)}</dd>
-                  </div>
-                  <div>
-                    <dt>Exporter</dt>
-                    <dd>{server.sourceUrl}</dd>
-                  </div>
-                  <div>
-                    <dt>Join link</dt>
-                    <dd>{server.joinLink || '—'}</dd>
-                  </div>
-                </dl>
+                </div>
                 {server.error ? <p className="error-text">{server.error}</p> : null}
               </article>
             ))}
           </div>
         </section>
 
-        <section className="panel panel-span">
-          <div className="panel-header">
-            <h2>Debug log</h2>
-            <span className="badge">{logs.length} events</span>
-          </div>
+        <details className="panel panel-span panel-details">
+          <summary className="details-summary">
+            <span>Debug log</span>
+            <span className="badge badge-muted">{logs.length}</span>
+          </summary>
           <div className="log-box">
             {logs.length ? logs.map((line) => <pre key={line}>{line}</pre>) : <pre>Лог пуст.</pre>}
           </div>
-        </section>
+        </details>
       </main>
     </div>
   );

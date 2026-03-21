@@ -45,9 +45,7 @@ npm run dev
 {
   "app": {
     "title": "BSS AutoConnect",
-    "pollIntervalMs": 180000,
-    "testSequenceServerIds": [2, 1],
-    "testSequenceDelayMs": 10000
+    "pollIntervalMs": 180000
   },
   "policy": {
     "timezone": "Europe/Moscow",
@@ -71,6 +69,8 @@ npm run dev
   ]
 }
 ```
+
+При необходимости можно временно добавить `app.testSequenceServerIds` и `app.testSequenceDelayMs` для ручного end-to-end теста последовательности redirect-ов.
 
 Важно: это публичный клиентский конфиг. Даже если он подставляется через GitHub Secrets, после билда значения становятся видимыми в браузере. Не кладите туда приватные ключи.
 
