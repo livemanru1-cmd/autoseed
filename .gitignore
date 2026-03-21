@@ -1,0 +1,8 @@
+node_modules
+dist
+.DS_Store
+prompt.md
+public/runtime-config.json
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts

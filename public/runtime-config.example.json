@@ -1,0 +1,27 @@
+{
+  "app": {
+    "title": "BSS AutoConnect",
+    "pollIntervalMs": 180000,
+    "debugLogLimit": 80
+  },
+  "policy": {
+    "timezone": "Europe/Moscow",
+    "nightWindowStart": "23:00",
+    "nightWindowEnd": "08:00",
+    "nightPreferredServerId": 1,
+    "maxSeedPlayers": 80,
+    "priorityOrder": [1, 2, 4],
+    "switchDelta": 10,
+    "cooldownMs": 600000
+  },
+  "exporters": [
+    {
+      "name": "classic",
+      "baseUrl": "https://classic-autoseed.example.com"
+    },
+    {
+      "name": "specops",
+      "baseUrl": "https://specops-autoseed.example.com"
+    }
+  ]
+}
