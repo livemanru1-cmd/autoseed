@@ -75,6 +75,6 @@ CI workflow лежит в `.github/workflows/deploy-pages.yml`.
 
 ## Документация
 
-- [README.md](/home/kyarkov/dev/test/autoseed/README.md)
-- [docs/autoseed-tz.md](/home/kyarkov/dev/test/autoseed/docs/autoseed-tz.md)
-- [docs/setup.md](/home/kyarkov/dev/test/autoseed/docs/setup.md)
+- [README.md](./README.md)
+- [docs/autoseed-tz.md](./docs/autoseed-tz.md)
+- [docs/setup.md](./docs/setup.md)
