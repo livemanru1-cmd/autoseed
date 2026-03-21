@@ -9,6 +9,7 @@
 - frontend полностью статический и публикуется через GitHub Pages;
 - exporter публикуется отдельно через `https://api.squad.leo-land.ru/squadjs1/v1/autoseed` и `https://api.squad.leo-land.ru/squadjs2/v1/autoseed`;
 - exporter отдаёт только факты по серверам: `healthz` и `snapshot`;
+- `joinLink` приходит готовым из exporter-а и может быть прямым `steam://connect/...` или внешним HTTPS-redirect;
 - policy живёт только во frontend runtime-config;
 - текущий приоритет выбора: ночью `serverId=2`, днём `2 -> 1`.
 
