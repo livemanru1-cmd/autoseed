@@ -88,7 +88,7 @@
   "isSeedCandidate": true,
   "publicConnectHost": "${SQUAD_PUBLIC_HOST}",
   "publicConnectPort": "${SQUAD_PUBLIC_PORT}",
-  "joinLinkTemplate": "https://p.sqstat.ru/c/109775243470969105/76561199152953122",
+  "joinLinkTemplate": "steam://connect/{host}:{port}",
   "corsOrigins": ["*"],
   "snapshotRefreshIntervalMs": 20000,
   "staleAfterMs": 90000,
@@ -103,7 +103,7 @@
 - `SQUAD_PUBLIC_HOST`: публичный IP/домен, который пойдёт в `steam://connect/...`.
 - `SQUAD_PUBLIC_PORT`: публичный connect-port сервера Squad.
 
-Если удобнее использовать уже готовый внешний redirect, `joinLinkTemplate` можно задать фиксированной HTTPS-ссылкой без `{host}` и `{port}`. Тогда exporter будет отдавать её как есть, а `publicConnectHost/publicConnectPort` останутся резервным вариантом для прямого `steam://connect/...`.
+По умолчанию лучше использовать прямой `joinLinkTemplate: "steam://connect/{host}:{port}"`, чтобы не зависеть от внешнего redirect-сервиса. Если всё же нужен внешний redirect, `joinLinkTemplate` можно задать фиксированной HTTPS-ссылкой без `{host}` и `{port}`. Тогда exporter будет отдавать её как есть.
 
 ## 3. Что менять при переносе на другие IP и серверы
 
@@ -135,7 +135,7 @@
 
 При этом в SquadJS-конфигах `queryPort` остаётся `7810` и `7811`. Это нормально: `queryPort` и публичный connect-port могут не совпадать, поэтому `joinLink` должен собираться именно из `SQUAD_PUBLIC_HOST` и `SQUAD_PUBLIC_PORT`.
 
-Для BSS сейчас удобнее использовать фиксированные `sqstat` redirect-ссылки через `joinLinkTemplate`, а `SQUAD_PUBLIC_HOST/SQUAD_PUBLIC_PORT` оставить как запасной путь.
+Для BSS сейчас предпочтительнее прямой `steam://connect/{host}:{port}` через `SQUAD_PUBLIC_HOST/SQUAD_PUBLIC_PORT`, без промежуточного `sqstat` redirect.
 
 ## 5. Готовые сервисы для Dokploy
 
