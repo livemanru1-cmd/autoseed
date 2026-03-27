@@ -71,10 +71,10 @@ type GuideStep = {
   hints: string[];
 };
 
-type GuideWindow = {
+type InlineHelpProps = {
+  label: string;
   title: string;
   description: string;
-  label: string;
 };
 
 const EMPTY_SNAPSHOT: CombinedSnapshot = {
@@ -574,6 +574,20 @@ function buildConnectorWindowBootMarkup(title: string): string {
     </div>
   </body>
 </html>`;
+}
+
+function InlineHelp({ label, title, description }: InlineHelpProps) {
+  return (
+    <details className="panel-help">
+      <summary className="panel-help-trigger" aria-label={label} title={label}>
+        <span aria-hidden="true">?</span>
+      </summary>
+      <div className="panel-help-popover">
+        <strong>{title}</strong>
+        <p>{description}</p>
+      </div>
+    </details>
+  );
 }
 
 function TeamPanel({ team, opponent }: TeamPanelProps) {
@@ -1175,6 +1189,8 @@ export default function App({ config }: AppProps) {
   const liveServerCount = snapshot.servers.filter((server) => server.online).length;
   const healthyExporterCount = Math.max(0, config.exporters.length - snapshot.errors.length);
   const latestLog = logs[logs.length - 1] || 'Событий пока нет.';
+  const diagnosticsIssueCount = snapshot.errors.length + (fatalError ? 1 : 0);
+  const debugLogCount = logs.length;
   const orderedServers = useMemo(
     () =>
       snapshot.servers
@@ -1229,32 +1245,6 @@ export default function App({ config }: AppProps) {
       hints: ['Карточки: «Текущая цель» и «Куда заходить»', 'Кнопка в карточке сервера: «Подключиться напрямую»']
     }
   ];
-  const guideWindows: GuideWindow[] = [
-    {
-      title: 'Основное окно AutoSeed',
-      label: 'Dashboard',
-      description:
-        'Главный экран. Здесь запускается логика, выбирается режим, видно текущий target, состояние exporter-ов и баланс сторон.'
-    },
-    {
-      title: 'Служебное окно коннектора',
-      label: 'Popup',
-      description:
-        'Открывается после включения коннектора. Нужен только для redirect в Steam и для follow-up переходов в тестовой последовательности.'
-    },
-    {
-      title: 'Steam / Squad',
-      label: 'Client',
-      description:
-        'Финальная точка входа. Держи Squad открытым в главном меню: так redirect проходит быстрее и стабильнее.'
-    },
-    {
-      title: 'Карточка выбранного сервера',
-      label: 'Target',
-      description:
-        'Большой блок ниже переключателя серверов. Здесь прогресс рассида, команды, слабая сторона и запасная кнопка ручного входа.'
-    }
-  ];
 
   useEffect(() => {
     if (!orderedServers.length) {
@@ -1275,14 +1265,22 @@ export default function App({ config }: AppProps) {
     <div className="shell modern-shell" style={BRAND_STYLE}>
       <header className="hero hero-redesign">
         <div className="hero-main hero-main-tight">
-          <div className="hero-brand">
-            <div className="hero-logo-shell">
-              <img className="hero-logo" src={projectLogo} alt={`${config.app.title} logo`} />
+          <div className="hero-topline">
+            <div className="hero-brand">
+              <div className="hero-logo-shell">
+                <img className="hero-logo" src={projectLogo} alt={`${config.app.title} logo`} />
+              </div>
+              <div className="hero-brand-copy">
+                <span className="hero-brand-kicker">Mdj BSS</span>
+                <span className="hero-brand-subtitle">auto-connect control room</span>
+              </div>
             </div>
-            <div className="hero-brand-copy">
-              <span className="hero-brand-kicker">Mdj BSS</span>
-              <span className="hero-brand-subtitle">auto-connect control room</span>
-            </div>
+
+            <InlineHelp
+              label="Справка по главному экрану"
+              title="Основное окно AutoSeed"
+              description="Главный экран. Здесь включается автоконнектор, выбирается режим, виден target, состояния браузера и exporter-ов."
+            />
           </div>
 
           <p className="eyebrow">BSS Seed Connect</p>
@@ -1402,29 +1400,43 @@ export default function App({ config }: AppProps) {
           ) : null}
 
           <div className="signal-grid compact-signal-grid">
-            <div className="signal-card">
-              <span
-                className={classNames(
-                  'signal-dot',
-                  permissions?.popupAllowed ? 'signal-dot-good' : 'signal-dot-bad'
-                )}
-              />
-              <div>
-                <strong>Popup</strong>
-                <p>{permissions?.popupAllowed ? 'готов' : 'не готов'}</p>
+            <div className="signal-card signal-card-with-help">
+              <div className="signal-card-main">
+                <span
+                  className={classNames(
+                    'signal-dot',
+                    permissions?.popupAllowed ? 'signal-dot-good' : 'signal-dot-bad'
+                  )}
+                />
+                <div>
+                  <strong>Popup</strong>
+                  <p>{permissions?.popupAllowed ? 'готов' : 'не готов'}</p>
+                </div>
               </div>
+              <InlineHelp
+                label="Что делает popup"
+                title="Служебное окно коннектора"
+                description="Открывается после включения автоконнектора. Оно нужно только для redirect-а в Steam и для follow-up переходов, закрывать его во время работы не стоит."
+              />
             </div>
-            <div className="signal-card">
-              <span
-                className={classNames(
-                  'signal-dot',
-                  permissions?.steamProtocolReady ? 'signal-dot-good' : 'signal-dot-bad'
-                )}
-              />
-              <div>
-                <strong>Steam</strong>
-                <p>{permissions?.steamProtocolReady ? 'готов' : 'не готов'}</p>
+            <div className="signal-card signal-card-with-help">
+              <div className="signal-card-main">
+                <span
+                  className={classNames(
+                    'signal-dot',
+                    permissions?.steamProtocolReady ? 'signal-dot-good' : 'signal-dot-bad'
+                  )}
+                />
+                <div>
+                  <strong>Steam</strong>
+                  <p>{permissions?.steamProtocolReady ? 'готов' : 'не готов'}</p>
+                </div>
               </div>
+              <InlineHelp
+                label="Что значит Steam"
+                title="Steam / Squad"
+                description="Это финальная точка подключения. Держи Squad открытым в главном меню, чтобы redirect в клиент проходил быстрее и стабильнее."
+              />
             </div>
             <div className="signal-card">
               <span
@@ -1458,78 +1470,39 @@ export default function App({ config }: AppProps) {
         </aside>
       </header>
 
-      <section className="help-strip" aria-label="Справка по интерфейсу">
-        <details className="help-popover">
-          <summary className="help-trigger">
-            <span className="help-trigger-icon" aria-hidden="true">
-              ?
-            </span>
-            <span>Как запустить</span>
-          </summary>
+      <details className="panel panel-span guide-spoiler">
+        <summary className="details-summary">
+          <span>Как запустить</span>
+          <span className="badge badge-muted">{quickStartSteps.length} шага</span>
+        </summary>
+        <div className="guide-spoiler-body">
+          <p className="guide-spoiler-copy">
+            Весь сценарий укладывается в четыре действия: выбрать режим, проверить браузер,
+            включить коннектор и при необходимости зайти вручную в нужный target.
+          </p>
 
-          <div className="help-panel">
-            <div className="help-panel-head">
-              <p className="eyebrow">Быстрый запуск</p>
-              <h2>Что нажимать и в каком порядке</h2>
-              <p>
-                Весь сценарий укладывается в четыре действия: выбрать режим, проверить браузер,
-                включить коннектор и при необходимости зайти вручную в нужный target.
-              </p>
-            </div>
-
-            <ol className="guide-steps" aria-label="Пошаговая инструкция">
-              {quickStartSteps.map((item) => (
-                <li key={item.id} className="guide-step">
-                  <span className="guide-step-index" aria-hidden="true">
-                    {item.step}
-                  </span>
-                  <div className="guide-step-copy">
-                    <strong>{item.title}</strong>
-                    <p>{item.description}</p>
-                    <div className="guide-pill-row">
-                      {item.hints.map((hint) => (
-                        <span key={`${item.id}-${hint}`} className="guide-pill">
-                          {hint}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </details>
-
-        <details className="help-popover">
-          <summary className="help-trigger">
-            <span className="help-trigger-icon" aria-hidden="true">
-              ?
-            </span>
-            <span>Окна и блоки</span>
-          </summary>
-
-          <div className="help-panel">
-            <div className="help-panel-head">
-              <p className="eyebrow">Окна и блоки</p>
-              <h2>Что за что отвечает</h2>
-              <p>
-                Справа в шапке живут управляющие кнопки, ниже идут подсказки по target-у, а
-                служебный popup нужен только для перехода в Steam.
-              </p>
-            </div>
-
-            <div className="guide-window-grid guide-window-grid-compact">
-              {guideWindows.map((item) => (
-                <article key={item.title} className="guide-window-card">
-                  <span className="guide-window-label">{item.label}</span>
+          <ol className="guide-steps" aria-label="Пошаговая инструкция">
+            {quickStartSteps.map((item) => (
+              <li key={item.id} className="guide-step">
+                <span className="guide-step-index" aria-hidden="true">
+                  {item.step}
+                </span>
+                <div className="guide-step-copy">
                   <strong>{item.title}</strong>
                   <p>{item.description}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-        </details>
-      </section>
+                  <div className="guide-pill-row">
+                    {item.hints.map((hint) => (
+                      <span key={`${item.id}-${hint}`} className="guide-pill">
+                        {hint}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </details>
 
       {(fatalError || snapshot.errors.length) && (
         <section className="alert-strip">
@@ -1661,7 +1634,14 @@ export default function App({ config }: AppProps) {
               <div className="server-board-top">
                 <div className="server-title-block">
                   <div className="server-title-row">
-                    <h2>{server.name}</h2>
+                    <div className="server-title-main">
+                      <h2>{server.name}</h2>
+                      <InlineHelp
+                        label="Справка по карточке сервера"
+                        title="Карточка выбранного сервера"
+                        description="Это главный target-блок ниже переключателя серверов. Здесь видно текущий онлайн, прогресс рассида, слабую сторону и ручную кнопку входа."
+                      />
+                    </div>
                     <div className="server-chip-row">
                       <span
                         className={classNames(
@@ -1804,7 +1784,9 @@ export default function App({ config }: AppProps) {
       <details className="panel panel-span panel-details">
         <summary className="details-summary">
           <span>Правила и диагностика</span>
-          <span className="badge badge-muted">{snapshot.errors.length + (fatalError ? 1 : 0)}</span>
+          {diagnosticsIssueCount > 0 ? (
+            <span className="badge badge-muted">{diagnosticsIssueCount}</span>
+          ) : null}
         </summary>
         <div className="diagnostics-grid">
           <div className="summary-stack">
@@ -1879,7 +1861,7 @@ export default function App({ config }: AppProps) {
       <details className="panel panel-span panel-details">
         <summary className="details-summary">
           <span>Debug log</span>
-          <span className="badge badge-muted">{logs.length}</span>
+          {debugLogCount > 0 ? <span className="badge badge-muted">{debugLogCount}</span> : null}
         </summary>
         <div className="log-box">
           {logs.length ? logs.map((line) => <pre key={line}>{line}</pre>) : <pre>Лог пуст.</pre>}
