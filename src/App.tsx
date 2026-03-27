@@ -130,6 +130,13 @@ function getSeedProgressPercent(server: ExporterServerSnapshot, seedLimit: numbe
   return Math.max(0, Math.min(100, Math.round((server.playerCount / seedLimit) * 100)));
 }
 
+function getSeedProgressGradient(percent: number): string {
+  const normalized = Math.max(0, Math.min(100, percent));
+  const startHue = Math.round((normalized / 100) * 120);
+  const endHue = Math.min(120, startHue + 14);
+  return `linear-gradient(90deg, hsl(${startHue} 78% 42%), hsl(${endHue} 86% 56%))`;
+}
+
 function canUseRedirectSequenceTarget(server: ExporterServerSnapshot | undefined): boolean {
   return Boolean(server?.online && server.joinLink);
 }
@@ -181,6 +188,7 @@ function escapeHtml(value: string): string {
 function buildConnectorWindowMarkup(context: ConnectorWindowContext): string {
   const { title, server, followupServer, followupDelayMs = 0, seedLimit } = context;
   const seedPercent = getSeedProgressPercent(server, seedLimit);
+  const seedGradient = getSeedProgressGradient(seedPercent);
   const weakerTeam = getWeakerTeam(server);
   const [teamOne, teamTwo] = server.teams;
   const matchupText =
@@ -267,7 +275,8 @@ function buildConnectorWindowMarkup(context: ConnectorWindowContext): string {
         display: block;
         height: 100%;
         width: ${seedPercent}%;
-        background: linear-gradient(90deg, var(--red), #ff6b6b);
+        background: ${seedGradient};
+        box-shadow: 0 0 18px rgba(0, 0, 0, 0.24);
       }
       .tag {
         display: inline-flex;
@@ -1225,7 +1234,12 @@ export default function App({ config }: AppProps) {
                   <strong>{seedPercent}%</strong>
                 </div>
                 <div className="server-meter server-meter-seed">
-                  <span style={{ width: `${seedPercent}%` }} />
+                  <span
+                    style={{
+                      width: `${seedPercent}%`,
+                      background: getSeedProgressGradient(seedPercent)
+                    }}
+                  />
                 </div>
               </div>
 

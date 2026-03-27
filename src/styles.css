@@ -517,6 +517,7 @@ input {
   display: block;
   height: 100%;
   border-radius: inherit;
+  transition: width 180ms ease, background 180ms ease;
 }
 
 .server-meter-neutral > span {
@@ -525,6 +526,7 @@ input {
 
 .server-meter-seed > span {
   background: linear-gradient(90deg, var(--red), #ff6b6b);
+  box-shadow: 0 0 18px rgba(0, 0, 0, 0.24);
 }
 
 .server-facts {
