@@ -528,16 +528,64 @@ input {
   background: rgba(120, 11, 11, 0.2);
 }
 
-.guide-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
-  gap: 14px;
+.help-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
   margin-top: 16px;
 }
 
-.guide-card {
+.help-popover {
+  width: min(100%, 760px);
+}
+
+.help-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 16px 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.help-trigger:hover {
+  transform: translateY(-1px);
+}
+
+.help-trigger::-webkit-details-marker {
+  display: none;
+}
+
+.help-trigger-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(225, 29, 47, 0.28), rgba(114, 13, 25, 0.22));
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.help-popover[open] .help-trigger {
+  border-color: rgba(225, 29, 47, 0.4);
+  background: linear-gradient(135deg, rgba(225, 29, 47, 0.16), rgba(114, 13, 25, 0.18));
+}
+
+.help-panel {
   position: relative;
   overflow: hidden;
+  margin-top: 10px;
   padding: 22px;
   border-radius: 26px;
   border: 1px solid var(--panel-border);
@@ -547,7 +595,7 @@ input {
   box-shadow: var(--shadow);
 }
 
-.guide-card::before {
+.help-panel::before {
   content: '';
   position: absolute;
   inset: auto -20px -64px auto;
@@ -558,17 +606,17 @@ input {
   pointer-events: none;
 }
 
-.guide-card-head {
+.help-panel-head {
   position: relative;
   z-index: 1;
 }
 
-.guide-card-head h2 {
+.help-panel-head h2 {
   margin: 0;
   font-size: clamp(1.45rem, 2.1vw, 2rem);
 }
 
-.guide-card-head p:last-child {
+.help-panel-head p:last-child {
   margin: 12px 0 0;
   color: var(--muted);
   line-height: 1.6;
@@ -644,6 +692,10 @@ input {
   display: grid;
   gap: 12px;
   margin-top: 18px;
+}
+
+.guide-window-grid-compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .guide-window-card {
@@ -1326,7 +1378,6 @@ input {
 
 @media (max-width: 1160px) {
   .hero,
-  .guide-grid,
   .server-board-top,
   .diagnostics-grid {
     grid-template-columns: 1fr;
@@ -1349,7 +1400,7 @@ input {
   }
 
   .hero,
-  .guide-card,
+  .help-panel,
   .server-board,
   .panel {
     padding: 18px;
@@ -1375,12 +1426,26 @@ input {
     align-items: flex-start;
   }
 
+  .help-strip,
+  .help-popover,
+  .help-trigger {
+    width: 100%;
+  }
+
+  .help-trigger {
+    justify-content: flex-start;
+  }
+
   .hero-logo-shell {
     width: 88px;
     height: 112px;
   }
 
   .guide-step {
+    grid-template-columns: 1fr;
+  }
+
+  .guide-window-grid-compact {
     grid-template-columns: 1fr;
   }
 

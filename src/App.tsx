@@ -1280,7 +1280,7 @@ export default function App({ config }: AppProps) {
               <img className="hero-logo" src={projectLogo} alt={`${config.app.title} logo`} />
             </div>
             <div className="hero-brand-copy">
-              <span className="hero-brand-kicker">Maj BSS</span>
+              <span className="hero-brand-kicker">Mdj BSS</span>
               <span className="hero-brand-subtitle">auto-connect control room</span>
             </div>
           </div>
@@ -1458,59 +1458,77 @@ export default function App({ config }: AppProps) {
         </aside>
       </header>
 
-      <section className="guide-grid">
-        <article className="guide-card guide-card-steps">
-          <div className="guide-card-head">
-            <p className="eyebrow">Быстрый запуск</p>
-            <h2>Что нажимать и в каком порядке</h2>
-            <p>
-              Весь сценарий укладывается в четыре действия: выбрать режим, проверить браузер,
-              включить коннектор и при необходимости зайти вручную в нужный target.
-            </p>
-          </div>
+      <section className="help-strip" aria-label="Справка по интерфейсу">
+        <details className="help-popover">
+          <summary className="help-trigger">
+            <span className="help-trigger-icon" aria-hidden="true">
+              ?
+            </span>
+            <span>Как запустить</span>
+          </summary>
 
-          <ol className="guide-steps" aria-label="Пошаговая инструкция">
-            {quickStartSteps.map((item) => (
-              <li key={item.id} className="guide-step">
-                <span className="guide-step-index" aria-hidden="true">
-                  {item.step}
-                </span>
-                <div className="guide-step-copy">
+          <div className="help-panel">
+            <div className="help-panel-head">
+              <p className="eyebrow">Быстрый запуск</p>
+              <h2>Что нажимать и в каком порядке</h2>
+              <p>
+                Весь сценарий укладывается в четыре действия: выбрать режим, проверить браузер,
+                включить коннектор и при необходимости зайти вручную в нужный target.
+              </p>
+            </div>
+
+            <ol className="guide-steps" aria-label="Пошаговая инструкция">
+              {quickStartSteps.map((item) => (
+                <li key={item.id} className="guide-step">
+                  <span className="guide-step-index" aria-hidden="true">
+                    {item.step}
+                  </span>
+                  <div className="guide-step-copy">
+                    <strong>{item.title}</strong>
+                    <p>{item.description}</p>
+                    <div className="guide-pill-row">
+                      {item.hints.map((hint) => (
+                        <span key={`${item.id}-${hint}`} className="guide-pill">
+                          {hint}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </details>
+
+        <details className="help-popover">
+          <summary className="help-trigger">
+            <span className="help-trigger-icon" aria-hidden="true">
+              ?
+            </span>
+            <span>Окна и блоки</span>
+          </summary>
+
+          <div className="help-panel">
+            <div className="help-panel-head">
+              <p className="eyebrow">Окна и блоки</p>
+              <h2>Что за что отвечает</h2>
+              <p>
+                Справа в шапке живут управляющие кнопки, ниже идут подсказки по target-у, а
+                служебный popup нужен только для перехода в Steam.
+              </p>
+            </div>
+
+            <div className="guide-window-grid guide-window-grid-compact">
+              {guideWindows.map((item) => (
+                <article key={item.title} className="guide-window-card">
+                  <span className="guide-window-label">{item.label}</span>
                   <strong>{item.title}</strong>
                   <p>{item.description}</p>
-                  <div className="guide-pill-row">
-                    {item.hints.map((hint) => (
-                      <span key={`${item.id}-${hint}`} className="guide-pill">
-                        {hint}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </article>
-
-        <article className="guide-card guide-card-windows">
-          <div className="guide-card-head">
-            <p className="eyebrow">Окна и блоки</p>
-            <h2>Что за что отвечает</h2>
-            <p>
-              Чтобы не путаться в интерфейсе: справа в шапке живут управляющие кнопки, ниже идут
-              подсказки по target-у, а служебный popup нужен только для перехода в Steam.
-            </p>
+                </article>
+              ))}
+            </div>
           </div>
-
-          <div className="guide-window-grid">
-            {guideWindows.map((item) => (
-              <article key={item.title} className="guide-window-card">
-                <span className="guide-window-label">{item.label}</span>
-                <strong>{item.title}</strong>
-                <p>{item.description}</p>
-              </article>
-            ))}
-          </div>
-        </article>
+        </details>
       </section>
 
       {(fatalError || snapshot.errors.length) && (
