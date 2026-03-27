@@ -1,6 +1,8 @@
 node_modules
 dist
 .DS_Store
+.env
+.env.*
 prompt.md
 public/runtime-config.json
 *.tsbuildinfo

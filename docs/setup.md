@@ -87,7 +87,6 @@
   "serverId": 1,
   "serverCode": "squadjs1",
   "isSeedCandidate": true,
-  "squadbrowserApiBaseUrl": "${SQUADBROWSER_API_BASE_URL}",
   "squadbrowserApiKey": "${SQUADBROWSER_API_KEY}",
   "squadbrowserTimeoutMs": 4000,
   "squadbrowserJoinLinkTtlMs": 300000,
@@ -102,10 +101,9 @@
 Если SquadJS запускается через текущий `docker-entrypoint.sh`, то `config/$INSTANCE_NAME.json` проходит через `envsubst`. Для exporter-а удобно держать отдельно:
 
 - `SQUAD_HOST`: адрес, куда сам SquadJS ходит за A2S/RCON.
-- `SQUADBROWSER_API_BASE_URL`: base URL внешнего `Squadbrowser API`, например `https://example.com/api`.
 - `SQUADBROWSER_API_KEY`: ключ для `POST /pub/join-link`.
 
-Если `SQUADBROWSER_API_BASE_URL` и `SQUADBROWSER_API_KEY` заданы, exporter получает join lobby link через `Squadbrowser API` по exact server name и публикует его в `snapshot`. Если `Squadbrowser` не ответил валидным lobby link, exporter возвращает `joinLink: null`, а frontend должен считать автоконнектор неготовым.
+По умолчанию exporter ходит в `https://endback.squadbrowser.app/api` и по `SQUADBROWSER_API_KEY` получает join lobby link через `Squadbrowser API` по exact server name. Если `Squadbrowser` не ответил валидным lobby link, exporter возвращает `joinLink: null`, а frontend должен считать автоконнектор неготовым.
 
 ## 3. Что менять при переносе на другие IP и серверы
 
@@ -123,7 +121,6 @@
 - `serverId`
 - `serverCode`
 - `pathPrefix`
-- `squadbrowserApiBaseUrl`
 - `squadbrowserApiKey`
 - `corsOrigins`
 
@@ -157,7 +154,6 @@ services:
       INSTANCE_NAME: squad1
       SQUADJS_DISCORD_TOKEN: ${SQUADJS_DISCORD_TOKEN}
       SQUAD_HOST: ${SQUAD1_HOST}
-      SQUADBROWSER_API_BASE_URL: ${SQUADBROWSER_API_BASE_URL}
       SQUADBROWSER_API_KEY: ${SQUADBROWSER_API_KEY}
       SQUAD_RCON_PASSWORD: ${SQUAD1_RCON_PASSWORD}
       MYSQL_HOST: ${MYSQL_HOST}
@@ -180,7 +176,6 @@ services:
       INSTANCE_NAME: squad2
       SQUADJS_DISCORD_TOKEN: ${SQUADJS_DISCORD_TOKEN}
       SQUAD_HOST: ${SQUAD2_HOST}
-      SQUADBROWSER_API_BASE_URL: ${SQUADBROWSER_API_BASE_URL}
       SQUADBROWSER_API_KEY: ${SQUADBROWSER_API_KEY}
       SQUAD_RCON_PASSWORD: ${SQUAD2_RCON_PASSWORD}
       MYSQL_HOST: ${MYSQL_HOST}
