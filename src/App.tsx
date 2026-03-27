@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent } from 'react';
 
 import { runPermissionCheck } from './lib/permissions';
 import {
@@ -26,6 +26,7 @@ import type {
   ExporterTeamSnapshot,
   SelectionState
 } from './types';
+import projectLogo from '../image.png';
 
 type AppProps = {
   config: AppConfig;
@@ -62,6 +63,20 @@ type ConnectorWindowContext = {
   seedLimit: number;
 };
 
+type GuideStep = {
+  id: string;
+  step: string;
+  title: string;
+  description: string;
+  hints: string[];
+};
+
+type GuideWindow = {
+  title: string;
+  description: string;
+  label: string;
+};
+
 const EMPTY_SNAPSHOT: CombinedSnapshot = {
   timestamp: 0,
   generatedAt: '',
@@ -70,6 +85,9 @@ const EMPTY_SNAPSHOT: CombinedSnapshot = {
 };
 
 const IMMEDIATE_REDIRECT_SNAPSHOT_MAX_AGE_MS = 15_000;
+const BRAND_STYLE = {
+  '--brand-logo': `url(${projectLogo})`
+} as CSSProperties;
 
 function formatTimestamp(value: number | string | undefined): string {
   if (!value) return '—';
@@ -282,6 +300,7 @@ function buildConnectorWindowMarkup(context: ConnectorWindowContext): string {
   const { title, server, followupServer, followupDelayMs = 0, seedLimit } = context;
   const seedPercent = getSeedProgressPercent(server, seedLimit);
   const seedGradient = getSeedProgressGradient(seedPercent);
+  const escapedLogo = escapeHtml(projectLogo);
   const weakerTeam = getWeakerTeam(server);
   const [teamOne, teamTwo] = server.teams;
   const matchupText =
@@ -313,30 +332,63 @@ function buildConnectorWindowMarkup(context: ConnectorWindowContext): string {
         --red: #dd1f1f;
         --green: #20c45a;
         --amber: #f59e0b;
+        --brand: url("${escapedLogo}");
       }
       * { box-sizing: border-box; }
       html, body { margin: 0; min-height: 100%; font-family: Inter, system-ui, sans-serif; background:
         radial-gradient(circle at top left, rgba(221, 31, 31, 0.24), transparent 28%),
+        radial-gradient(circle at 100% 100%, rgba(255, 255, 255, 0.08), transparent 24%),
+        linear-gradient(180deg, rgba(0, 0, 0, 0.44), rgba(0, 0, 0, 0.76)),
+        var(--brand) center/cover no-repeat,
         linear-gradient(180deg, #020202 0%, #090909 100%);
         color: var(--text); }
       body { display: grid; place-items: center; padding: 16px; }
       .panel {
+        position: relative;
         width: min(440px, 100%);
         border: 1px solid var(--line);
         border-radius: 24px;
         background: var(--panel);
         padding: 22px;
+        overflow: hidden;
         box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
       }
+      .panel::before {
+        content: "";
+        position: absolute;
+        inset: auto -30px -40px auto;
+        width: 210px;
+        height: 210px;
+        background: var(--brand) center/contain no-repeat;
+        opacity: 0.12;
+        filter: saturate(1.05);
+        pointer-events: none;
+      }
+      .panel > * { position: relative; z-index: 1; }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .brand-mark {
+        width: 58px;
+        height: 58px;
+        border-radius: 18px;
+        border: 1px solid rgba(255,255,255,.08);
+        background: rgba(0,0,0,.35);
+        object-fit: contain;
+        padding: 6px;
+      }
       .eyebrow {
-        margin: 0 0 8px;
+        margin: 0 0 6px;
         color: var(--muted);
         font-size: 12px;
         letter-spacing: 0.14em;
         text-transform: uppercase;
       }
+      .brand-copy p { margin-top: 4px; }
       h1 {
-        margin: 0;
+        margin: 12px 0 0;
         font-size: 24px;
         line-height: 1.05;
       }
@@ -397,7 +449,13 @@ function buildConnectorWindowMarkup(context: ConnectorWindowContext): string {
   </head>
   <body>
     <main class="panel">
-      <p class="eyebrow">BSS AutoConnect</p>
+      <div class="brand">
+        <img class="brand-mark" src="${escapedLogo}" alt="" />
+        <div class="brand-copy">
+          <p class="eyebrow">BSS AutoConnect</p>
+          <p>Служебное окно держит redirect-цепочку и не даёт браузеру потерять переход в Steam.</p>
+        </div>
+      </div>
       <h1>${escapeHtml(server.name)}</h1>
       <p>Держи Squad открытым в главном меню. Окно нужно только для redirect в Steam.</p>
       <div class="stack">
@@ -433,6 +491,87 @@ function buildConnectorWindowMarkup(context: ConnectorWindowContext): string {
         </div>
       </div>
     </main>
+  </body>
+</html>`;
+}
+
+function buildConnectorWindowBootMarkup(title: string): string {
+  const escapedLogo = escapeHtml(projectLogo);
+
+  return `<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${escapeHtml(title)}</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --brand: url("${escapedLogo}");
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        min-height: 100%;
+        font-family: Inter, system-ui, sans-serif;
+        color: #f3f3f3;
+        background:
+          radial-gradient(circle at top left, rgba(221, 31, 31, 0.24), transparent 28%),
+          linear-gradient(180deg, rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0.78)),
+          var(--brand) center/cover no-repeat,
+          #060606;
+      }
+      body {
+        display: grid;
+        place-items: center;
+        padding: 16px;
+      }
+      .boot {
+        width: min(340px, 100%);
+        padding: 18px;
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 22px;
+        background: rgba(17, 17, 17, 0.92);
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.52);
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .brand img {
+        width: 56px;
+        height: 56px;
+        padding: 6px;
+        border-radius: 16px;
+        border: 1px solid rgba(255,255,255,.08);
+        background: rgba(0,0,0,.35);
+        object-fit: contain;
+      }
+      .eyebrow {
+        margin: 0 0 4px;
+        color: rgba(255,255,255,.6);
+        font-size: 12px;
+        letter-spacing: .14em;
+        text-transform: uppercase;
+      }
+      p {
+        margin: 0;
+        color: rgba(255,255,255,.76);
+        line-height: 1.5;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="boot">
+      <div class="brand">
+        <img src="${escapedLogo}" alt="" />
+        <div>
+          <p class="eyebrow">BSS AutoConnect</p>
+          <p>Служебное окно коннектора готово. Не закрывайте его во время переключений.</p>
+        </div>
+      </div>
+    </div>
   </body>
 </html>`;
 }
@@ -661,9 +800,7 @@ export default function App({ config }: AppProps) {
       if (!nextWindow) return null;
 
       nextWindow.document.open();
-      nextWindow.document.write(
-        '<!doctype html><title>BSS AutoConnect</title><body style="margin:0;background:#060606;color:#f3f3f3;font-family:Inter,system-ui,sans-serif;display:grid;place-items:center;min-height:100vh"><div style="padding:18px;border:1px solid rgba(255,255,255,.08);border-radius:20px;background:#111;text-align:center;max-width:320px">Служебное окно коннектора готово.<br/>Не закрывайте его во время переключений.</div></body>'
-      );
+      nextWindow.document.write(buildConnectorWindowBootMarkup(config.app.title));
       nextWindow.document.close();
       connectorWindowRef.current = nextWindow;
       return nextWindow;
@@ -1055,6 +1192,69 @@ export default function App({ config }: AppProps) {
     orderedServers.find((server) => getServerSelectionKey(server) === activeServerKey) ||
     orderedServers[0] ||
     null;
+  const quickStartSteps: GuideStep[] = [
+    {
+      id: 'mode',
+      step: '1',
+      title: 'Выбери режим в правом верхнем блоке',
+      description: hasConfiguredTestMode
+        ? 'Оставляй «Боевой» для реальной работы по правилам. «Тест» нужен только чтобы прогнать заранее заданную последовательность серверов.'
+        : 'Сейчас доступен только «Боевой» режим, поэтому ничего переключать не нужно.',
+      hints: hasConfiguredTestMode
+        ? ['Кнопки: «Боевой» или «Тест»', 'Этот блок определяет сценарий redirect-а']
+        : ['Кнопка: «Боевой»', 'Тестовый режим не настроен в конфиге']
+    },
+    {
+      id: 'browser',
+      step: '2',
+      title: 'Нажми «Проверить браузер»',
+      description:
+        'Проверь, что браузер умеет открыть popup и передать ссылку в Steam. Пока оба индикатора не зелёные, автоконнектор не запустится.',
+      hints: ['Кнопка: «Проверить браузер»', 'Смотри статусы Popup и Steam']
+    },
+    {
+      id: 'connector',
+      step: '3',
+      title: 'Включи «Автоконнектор»',
+      description:
+        'После запуска откроется служебное окно коннектора. Оно занимается redirect-ом в Steam и должно оставаться открытым, пока идёт работа.',
+      hints: ['Кнопка: «Автоконнектор»', 'Служебное окно не закрывать']
+    },
+    {
+      id: 'manual',
+      step: '4',
+      title: 'Следи за target и, если нужно, жми прямой вход',
+      description:
+        'Ниже видно целевой сервер, слабую сторону и карточку выбранного сервера. Если нужен ручной обход автоматики, используй кнопку «Подключиться напрямую».',
+      hints: ['Карточки: «Текущая цель» и «Куда заходить»', 'Кнопка в карточке сервера: «Подключиться напрямую»']
+    }
+  ];
+  const guideWindows: GuideWindow[] = [
+    {
+      title: 'Основное окно AutoSeed',
+      label: 'Dashboard',
+      description:
+        'Главный экран. Здесь запускается логика, выбирается режим, видно текущий target, состояние exporter-ов и баланс сторон.'
+    },
+    {
+      title: 'Служебное окно коннектора',
+      label: 'Popup',
+      description:
+        'Открывается после включения коннектора. Нужен только для redirect в Steam и для follow-up переходов в тестовой последовательности.'
+    },
+    {
+      title: 'Steam / Squad',
+      label: 'Client',
+      description:
+        'Финальная точка входа. Держи Squad открытым в главном меню: так redirect проходит быстрее и стабильнее.'
+    },
+    {
+      title: 'Карточка выбранного сервера',
+      label: 'Target',
+      description:
+        'Большой блок ниже переключателя серверов. Здесь прогресс рассида, команды, слабая сторона и запасная кнопка ручного входа.'
+    }
+  ];
 
   useEffect(() => {
     if (!orderedServers.length) {
@@ -1072,9 +1272,19 @@ export default function App({ config }: AppProps) {
   }, [displayTargetServer, orderedServers]);
 
   return (
-    <div className="shell modern-shell">
+    <div className="shell modern-shell" style={BRAND_STYLE}>
       <header className="hero hero-redesign">
         <div className="hero-main hero-main-tight">
+          <div className="hero-brand">
+            <div className="hero-logo-shell">
+              <img className="hero-logo" src={projectLogo} alt={`${config.app.title} logo`} />
+            </div>
+            <div className="hero-brand-copy">
+              <span className="hero-brand-kicker">Maj BSS</span>
+              <span className="hero-brand-subtitle">auto-connect control room</span>
+            </div>
+          </div>
+
           <p className="eyebrow">BSS Seed Connect</p>
           <h1>{config.app.title}</h1>
           <p className="hero-copy hero-copy-tight">
@@ -1106,35 +1316,60 @@ export default function App({ config }: AppProps) {
         </div>
 
         <aside className="control-deck">
-          <div className="segmented-control">
-            <button
-              className={classNames('segment', productionMode && 'segment-active')}
-              onClick={productionMode ? undefined : handleModeToggle}
-              disabled={productionMode}
-            >
-              Боевой
-            </button>
-            <button
-              className={classNames('segment', isTestModeActive && 'segment-active')}
-              onClick={!productionMode ? undefined : handleModeToggle}
-              disabled={!hasConfiguredTestMode || isTestModeActive}
-            >
-              {hasConfiguredTestMode ? `Тест ${testSequencePlanLabel}` : 'Тест недоступен'}
-            </button>
+          <div className="guide-focus guide-focus-neutral">
+            <div className="guide-control-label">
+              <span className="guide-inline-step" aria-hidden="true">
+                1
+              </span>
+              <span>Сначала выбери режим</span>
+            </div>
+
+            <div className="segmented-control">
+              <button
+                className={classNames('segment', productionMode && 'segment-active')}
+                onClick={productionMode ? undefined : handleModeToggle}
+                disabled={productionMode}
+              >
+                Боевой
+              </button>
+              <button
+                className={classNames('segment', isTestModeActive && 'segment-active')}
+                onClick={!productionMode ? undefined : handleModeToggle}
+                disabled={!hasConfiguredTestMode || isTestModeActive}
+              >
+                {hasConfiguredTestMode ? `Тест ${testSequencePlanLabel}` : 'Тест недоступен'}
+              </button>
+            </div>
           </div>
 
           <button
-            className={classNames('power-button', enabled && 'power-button-live')}
+            className={classNames(
+              'power-button',
+              'guide-focus',
+              'guide-focus-primary',
+              enabled && 'power-button-live'
+            )}
             onClick={enabled ? handleDisable : () => void handleEnable()}
           >
-            <span className="power-caption">Автоконнектор</span>
+            <div className="power-button-head">
+              <span className="guide-inline-step guide-inline-step-large" aria-hidden="true">
+                3
+              </span>
+              <span className="power-caption">Автоконнектор</span>
+            </div>
             <strong>{enabled ? 'Включён' : 'Выключен'}</strong>
             <small>{statusText}</small>
           </button>
 
           <div className="control-actions">
-            <button className="button button-primary" onClick={() => void handlePermissionsCheck()}>
-              Проверить браузер
+            <button
+              className="button button-primary guide-button guide-focus guide-focus-primary"
+              onClick={() => void handlePermissionsCheck()}
+            >
+              <span className="guide-inline-step" aria-hidden="true">
+                2
+              </span>
+              <span>Проверить браузер</span>
             </button>
             <button className="button" onClick={() => void refreshSnapshot()}>
               Обновить сейчас
@@ -1222,6 +1457,61 @@ export default function App({ config }: AppProps) {
           </div>
         </aside>
       </header>
+
+      <section className="guide-grid">
+        <article className="guide-card guide-card-steps">
+          <div className="guide-card-head">
+            <p className="eyebrow">Быстрый запуск</p>
+            <h2>Что нажимать и в каком порядке</h2>
+            <p>
+              Весь сценарий укладывается в четыре действия: выбрать режим, проверить браузер,
+              включить коннектор и при необходимости зайти вручную в нужный target.
+            </p>
+          </div>
+
+          <ol className="guide-steps" aria-label="Пошаговая инструкция">
+            {quickStartSteps.map((item) => (
+              <li key={item.id} className="guide-step">
+                <span className="guide-step-index" aria-hidden="true">
+                  {item.step}
+                </span>
+                <div className="guide-step-copy">
+                  <strong>{item.title}</strong>
+                  <p>{item.description}</p>
+                  <div className="guide-pill-row">
+                    {item.hints.map((hint) => (
+                      <span key={`${item.id}-${hint}`} className="guide-pill">
+                        {hint}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </article>
+
+        <article className="guide-card guide-card-windows">
+          <div className="guide-card-head">
+            <p className="eyebrow">Окна и блоки</p>
+            <h2>Что за что отвечает</h2>
+            <p>
+              Чтобы не путаться в интерфейсе: справа в шапке живут управляющие кнопки, ниже идут
+              подсказки по target-у, а служебный popup нужен только для перехода в Steam.
+            </p>
+          </div>
+
+          <div className="guide-window-grid">
+            {guideWindows.map((item) => (
+              <article key={item.title} className="guide-window-card">
+                <span className="guide-window-label">{item.label}</span>
+                <strong>{item.title}</strong>
+                <p>{item.description}</p>
+              </article>
+            ))}
+          </div>
+        </article>
+      </section>
 
       {(fatalError || snapshot.errors.length) && (
         <section className="alert-strip">
@@ -1389,11 +1679,16 @@ export default function App({ config }: AppProps) {
                   <div className="server-board-actions">
                     <button
                       type="button"
-                      className="button button-primary"
+                      className="button button-primary guide-button guide-focus guide-focus-accent"
                       onClick={() => handleDirectJoin(server)}
                       disabled={!server.joinLink}
                     >
-                      {server.joinLink ? 'Подключиться напрямую' : 'Lobby link не готов'}
+                      <span className="guide-inline-step" aria-hidden="true">
+                        4
+                      </span>
+                      <span>
+                        {server.joinLink ? 'Подключиться напрямую' : 'Lobby link не готов'}
+                      </span>
                     </button>
                   </div>
                 </div>

@@ -51,6 +51,23 @@ input {
   padding: 24px 0 56px;
 }
 
+.modern-shell {
+  position: relative;
+  isolation: isolate;
+}
+
+.modern-shell::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at center, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.82)),
+    var(--brand-logo) center top 64px / min(72vw, 760px) auto no-repeat;
+  opacity: 0.16;
+  pointer-events: none;
+  z-index: -1;
+}
+
 .hero,
 .panel,
 .alert-strip,
@@ -63,20 +80,98 @@ input {
 }
 
 .hero {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
   gap: 18px;
   padding: 26px;
   border-radius: 30px;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(100deg, rgba(0, 0, 0, 0.3) 16%, rgba(0, 0, 0, 0.04) 55%),
+    var(--brand-logo) calc(100% + 120px) center / 540px auto no-repeat;
+  opacity: 0.16;
+  pointer-events: none;
+}
+
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: auto 18% -140px auto;
+  width: 320px;
+  height: 320px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(225, 29, 47, 0.18), transparent 68%);
+  filter: blur(6px);
+  pointer-events: none;
 }
 
 .hero-main {
   min-width: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .hero-main-tight {
   display: grid;
   align-content: start;
+}
+
+.hero-brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.hero-logo-shell {
+  width: 108px;
+  height: 136px;
+  flex: 0 0 auto;
+  padding: 10px;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    rgba(0, 0, 0, 0.24);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.hero-logo {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+}
+
+.hero-brand-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.hero-brand-kicker,
+.hero-brand-subtitle {
+  display: block;
+}
+
+.hero-brand-kicker {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.82rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.hero-brand-subtitle {
+  color: rgba(255, 255, 255, 0.54);
+  text-transform: lowercase;
 }
 
 .eyebrow {
@@ -174,6 +269,41 @@ input {
 .control-deck {
   display: grid;
   gap: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+.guide-control-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 0.94rem;
+}
+
+.guide-focus {
+  position: relative;
+  border-radius: 22px;
+}
+
+.guide-focus-neutral {
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.guide-focus-primary,
+.guide-focus-accent {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.03),
+    0 0 0 3px rgba(225, 29, 47, 0.14);
+}
+
+.guide-focus-accent {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.03),
+    0 0 0 3px rgba(245, 158, 11, 0.14);
 }
 
 .segmented-control {
@@ -187,6 +317,9 @@ input {
 }
 
 .segment {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 46px;
   border-radius: 14px;
   border: 1px solid transparent;
@@ -230,6 +363,12 @@ input {
   cursor: pointer;
 }
 
+.power-button-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .power-button strong {
   font-size: 1.9rem;
   line-height: 1;
@@ -255,6 +394,10 @@ input {
 }
 
 .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   min-height: 42px;
   border-radius: 14px;
   border: 1px solid var(--panel-border);
@@ -268,6 +411,30 @@ input {
 .button-primary {
   background: linear-gradient(135deg, var(--red), var(--red-deep));
   border-color: rgba(225, 29, 47, 0.45);
+}
+
+.guide-button {
+  justify-content: flex-start;
+}
+
+.guide-inline-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.8rem;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
+.guide-inline-step-large {
+  width: 32px;
+  height: 32px;
 }
 
 .delay-field {
@@ -359,6 +526,158 @@ input {
   padding: 14px 16px;
   border-radius: 18px;
   background: rgba(120, 11, 11, 0.2);
+}
+
+.guide-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.guide-card {
+  position: relative;
+  overflow: hidden;
+  padding: 22px;
+  border-radius: 26px;
+  border: 1px solid var(--panel-border);
+  background:
+    linear-gradient(180deg, rgba(18, 18, 18, 0.98), rgba(10, 10, 10, 0.96)),
+    var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.guide-card::before {
+  content: '';
+  position: absolute;
+  inset: auto -20px -64px auto;
+  width: 200px;
+  height: 200px;
+  background: var(--brand-logo) center/contain no-repeat;
+  opacity: 0.08;
+  pointer-events: none;
+}
+
+.guide-card-head {
+  position: relative;
+  z-index: 1;
+}
+
+.guide-card-head h2 {
+  margin: 0;
+  font-size: clamp(1.45rem, 2.1vw, 2rem);
+}
+
+.guide-card-head p:last-child {
+  margin: 12px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.guide-steps {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 12px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.guide-step {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.guide-step-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(225, 29, 47, 0.3), rgba(114, 13, 25, 0.2));
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.96rem;
+}
+
+.guide-step-copy strong {
+  display: block;
+  font-size: 1.02rem;
+  line-height: 1.35;
+}
+
+.guide-step-copy p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.guide-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.guide-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.82);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.74rem;
+}
+
+.guide-window-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.guide-window-card {
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.guide-window-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(245, 158, 11, 0.24);
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--amber);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.guide-window-card strong {
+  display: block;
+  margin-top: 12px;
+  font-size: 1rem;
+}
+
+.guide-window-card p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.55;
 }
 
 .alert-strip p {
@@ -1007,6 +1326,7 @@ input {
 
 @media (max-width: 1160px) {
   .hero,
+  .guide-grid,
   .server-board-top,
   .diagnostics-grid {
     grid-template-columns: 1fr;
@@ -1029,6 +1349,7 @@ input {
   }
 
   .hero,
+  .guide-card,
   .server-board,
   .panel {
     padding: 18px;
@@ -1048,6 +1369,19 @@ input {
   .summary-row {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .hero-brand {
+    align-items: flex-start;
+  }
+
+  .hero-logo-shell {
+    width: 88px;
+    height: 112px;
+  }
+
+  .guide-step {
+    grid-template-columns: 1fr;
   }
 
   .server-chip-row {
