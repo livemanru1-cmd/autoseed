@@ -23,6 +23,7 @@ export type SeedPolicy = {
   priorityOrder: number[];
   switchDelta: number;
   cooldownMs: number;
+  periodicReconnectMs: number;
 };
 
 export type ExporterEndpointConfig = {

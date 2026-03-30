@@ -763,6 +763,7 @@ export default function App({ config }: AppProps) {
   const enabledRef = useRef(enabled);
   const modeRef = useRef(mode);
   const snapshotRef = useRef(snapshot);
+  const isFetchingRef = useRef(isFetching);
   const cooldownUntilRef = useRef(cooldownUntil);
   const lastProcessedTimestampRef = useRef(lastProcessedTimestamp);
   const permissionsRef = useRef(permissions);
@@ -781,6 +782,10 @@ export default function App({ config }: AppProps) {
   useEffect(() => {
     snapshotRef.current = snapshot;
   }, [snapshot]);
+
+  useEffect(() => {
+    isFetchingRef.current = isFetching;
+  }, [isFetching]);
 
   useEffect(() => {
     modeRef.current = mode;
@@ -861,6 +866,7 @@ export default function App({ config }: AppProps) {
     Math.round(configuredTestSequenceDelayMs / 1000)
   );
   const testCooldownMs = Math.max(0, testModeConfig?.cooldownMs || 30000);
+  const periodicReconnectMs = Math.max(0, effectivePolicy.periodicReconnectMs || 0);
   const testSequencePlanLabel = testModeConfig?.sequenceServerIds?.join(' -> ') || '—';
   const hasManualTestSequenceDelay = testSequenceDelayMsOverride > 0;
 
@@ -1337,6 +1343,27 @@ export default function App({ config }: AppProps) {
       setIsFetching(false);
     }
   };
+
+  const triggerPeriodicReconnect = useEffectEvent(() => {
+    if (!enabledRef.current || modeRef.current !== 'production') return;
+    if (isFetchingRef.current) return;
+
+    const targetServer = selection?.targetServer;
+    if (!targetServer?.joinLink) return;
+
+    appendLog(`Периодический reconnect: запрашиваю свежий snapshot для ${targetServer.name}.`);
+    void refreshSnapshot({ forceRedirect: true });
+  });
+
+  useEffect(() => {
+    if (!enabled || activeMode !== 'production' || periodicReconnectMs <= 0) return;
+
+    const timer = window.setInterval(() => {
+      triggerPeriodicReconnect();
+    }, periodicReconnectMs);
+
+    return () => window.clearInterval(timer);
+  }, [activeMode, enabled, periodicReconnectMs]);
 
   useEffect(() => {
     if (typeof window.EventSource === 'undefined') {

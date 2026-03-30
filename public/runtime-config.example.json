@@ -16,7 +16,8 @@
     "maxSeedPlayers": 80,
     "priorityOrder": [2, 1],
     "switchDelta": 10,
-    "cooldownMs": 600000
+    "cooldownMs": 600000,
+    "periodicReconnectMs": 600000
   },
   "exporters": [
     {

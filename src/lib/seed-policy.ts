@@ -13,7 +13,8 @@ export const DEFAULT_SEED_POLICY: SeedPolicy = {
   maxSeedPlayers: 80,
   priorityOrder: [2, 1],
   switchDelta: 10,
-  cooldownMs: 10 * 60 * 1000
+  cooldownMs: 10 * 60 * 1000,
+  periodicReconnectMs: 10 * 60 * 1000
 };
 
 function getMinutesInTimezone(timezone: string, date = new Date()): number {
