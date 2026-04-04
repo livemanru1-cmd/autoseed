@@ -48,7 +48,7 @@ function mapPlayer(player: ExporterSnapshotPlayerResponse): ExporterPlayerSnapsh
   return {
     eosId: player.eosId || null,
     steamId: player.steamId || null,
-    name: player.name || 'Unknown',
+    name: player.name || 'Игрок',
     teamId: Number(player.teamId) || null,
     teamName: player.teamName || null,
     squadId: Number(player.squadId) || null,
@@ -66,7 +66,7 @@ function mapPlayer(player: ExporterSnapshotPlayerResponse): ExporterPlayerSnapsh
 function mapSquad(squad: ExporterSnapshotSquadResponse): ExporterSquadSnapshot {
   return {
     id: Number(squad.id) || null,
-    name: squad.name || `Squad ${Number(squad.id) || 0}`,
+    name: squad.name || `Сквад ${Number(squad.id) || 0}`,
     playerCount: Number(squad.playerCount) || 0,
     totalPlaytimeSeconds:
       typeof squad.totalPlaytimeSeconds === 'number' ? squad.totalPlaytimeSeconds : null,
@@ -82,7 +82,7 @@ function mapSquad(squad: ExporterSnapshotSquadResponse): ExporterSquadSnapshot {
 function mapTeam(team: ExporterSnapshotTeamResponse): ExporterTeamSnapshot {
   return {
     id: Number(team.id) || null,
-    name: team.name || `Team ${Number(team.id) || 0}`,
+    name: team.name || `Сторона ${Number(team.id) || 0}`,
     playerCount: Number(team.playerCount) || 0,
     playersWithHours: Number(team.playersWithHours) || 0,
     totalPlaytimeSeconds:

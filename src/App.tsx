@@ -96,6 +96,7 @@ type InlineHelpProps = {
   label: string;
   title: string;
   description: string;
+  testId?: string;
 };
 
 const EMPTY_SNAPSHOT: CombinedSnapshot = {
@@ -135,8 +136,8 @@ function formatBool(value: boolean): string {
 }
 
 function formatCountdown(ms: number): string {
-  if (ms <= 0) return '0 s';
-  return `${Math.ceil(ms / 1000)} s`;
+  if (ms <= 0) return '0 с';
+  return `${Math.ceil(ms / 1000)} с`;
 }
 
 function formatHours(value: number | null | undefined): string {
@@ -349,21 +350,21 @@ function buildConnectorWindowMarkup(context: ConnectorWindowContext): string {
   const statusTag =
     phase === 'redirect_sent'
       ? hasFollowup
-        ? 'Первый redirect отправлен'
-        : 'Redirect отправлен'
-      : 'Передаём lobby link в Steam';
+        ? 'Первый переход отправлен'
+        : 'Переход отправлен'
+      : 'Передаём ссылку входа в Steam';
   const leadText =
     phase === 'redirect_sent'
-      ? 'Браузер не получает явный ответ от Steam или Squad. Если это окно осталось на служебной карточке, это нормально. Каждый следующий redirect заново запросит свежий lobby link.'
-      : 'Держи Squad открытым в главном меню. Окно нужно только для запроса lobby link и redirect в Steam.';
-  const nextStepLabel = hasFollowup ? 'Follow-up' : 'Дальше';
+      ? 'Браузер не получает отдельный ответ от Steam или Squad. Если окно осталось на служебной карточке, это нормально. Перед каждым следующим переходом запросим новую ссылку входа.'
+      : 'Держи Squad открытым в главном меню. Окно нужно только для запроса свежей ссылки входа и передачи перехода в Steam.';
+  const nextStepLabel = hasFollowup ? 'Следом' : 'Дальше';
   const nextStepText = hasFollowup
-    ? `Следом: ${escapeHtml(followupServer!.name)} через ${Math.ceil(followupDelayMs / 1000)} s`
+    ? `Следующий сервер: ${escapeHtml(followupServer!.name)} через ${Math.ceil(followupDelayMs / 1000)} с`
     : phase === 'redirect_sent'
-      ? 'Автоконнектор ждёт новый snapshot. Перед следующим переходом lobby link будет запрошен заново.'
-      : 'После отправки браузер не получит отдельный callback от Steam или Squad.';
+      ? 'Автоконнектор ждёт новый снимок. Перед следующим переходом ссылка входа будет запрошена заново.'
+      : 'После отправки браузер не получит отдельный ответ от Steam или Squad.';
   const snapshotText = formatCompactTimestamp(server.updatedAt);
-  const joinLinkText = 'Запрашивается перед каждым переходом';
+  const joinLinkText = 'Запрашивается прямо перед переходом';
 
   return `<!doctype html>
 <html lang="ru">
@@ -425,7 +426,9 @@ function buildConnectorWindowMarkup(context: ConnectorWindowContext): string {
         height: 58px;
         border-radius: 18px;
         border: 1px solid rgba(255,255,255,.08);
-        background: rgba(0,0,0,.35);
+        background:
+          radial-gradient(circle at 50% 24%, rgba(255,255,255,.14), transparent 58%),
+          rgba(9,14,21,.18);
         object-fit: contain;
         padding: 6px;
       }
@@ -503,7 +506,7 @@ function buildConnectorWindowMarkup(context: ConnectorWindowContext): string {
         <img class="brand-mark" src="${escapedLogo}" alt="" />
         <div class="brand-copy">
           <p class="eyebrow">BSS AutoConnect</p>
-          <p>Служебное окно держит redirect-цепочку и не даёт браузеру потерять переход в Steam.</p>
+          <p>Служебное окно держит цепочку переходов и не даёт браузеру потерять отправку в Steam.</p>
         </div>
       </div>
       <h1>${escapeHtml(server.name)}</h1>
@@ -541,7 +544,7 @@ function buildConnectorWindowMarkup(context: ConnectorWindowContext): string {
         </div>
         <div class="row">
           <div>
-            <div class="label">Lobby link</div>
+            <div class="label">Ссылка входа</div>
             <strong>${joinLinkText}</strong>
           </div>
         </div>
@@ -607,7 +610,9 @@ function buildConnectorWindowBootMarkup(title: string): string {
         padding: 6px;
         border-radius: 16px;
         border: 1px solid rgba(255,255,255,.08);
-        background: rgba(0,0,0,.35);
+        background:
+          radial-gradient(circle at 50% 24%, rgba(255,255,255,.14), transparent 58%),
+          rgba(9,14,21,.18);
         object-fit: contain;
       }
       .eyebrow {
@@ -638,13 +643,18 @@ function buildConnectorWindowBootMarkup(title: string): string {
 </html>`;
 }
 
-function InlineHelp({ label, title, description }: InlineHelpProps) {
+function InlineHelp({ label, title, description, testId }: InlineHelpProps) {
   return (
-    <details className="panel-help">
-      <summary className="panel-help-trigger" aria-label={label} title={label}>
+    <details className="panel-help" data-testid={testId ? `${testId}-container` : undefined}>
+      <summary
+        className="panel-help-trigger"
+        aria-label={label}
+        title={label}
+        data-testid={testId ? `${testId}-trigger` : undefined}
+      >
         <span aria-hidden="true">?</span>
       </summary>
-      <div className="panel-help-popover">
+      <div className="panel-help-popover" data-testid={testId ? `${testId}-popover` : undefined}>
         <strong>{title}</strong>
         <p>{description}</p>
       </div>
@@ -874,8 +884,8 @@ export default function App({ config }: AppProps) {
     if (!canRequestJoinLink(server)) {
       appendLog(
         reason === 'direct'
-          ? `Прямое подключение недоступно: ${server.name} сейчас offline.`
-          : `Redirect подавлен: ${server.name} сейчас offline.`
+          ? `Прямое подключение недоступно: ${server.name} сейчас оффлайн.`
+          : `Переход отменён: ${server.name} сейчас оффлайн.`
       );
       return null;
     }
@@ -884,18 +894,19 @@ export default function App({ config }: AppProps) {
     setJoinLinkRequestServerKey(serverKey);
     appendLog(
       reason === 'direct'
-        ? `Прямое подключение: запрашиваю свежий lobby link для ${server.name}.`
-        : `Запрашиваю свежий lobby link для ${server.name}.`
+        ? `Прямое подключение: запрашиваю свежую ссылку входа для ${server.name}.`
+        : `Запрашиваю свежую ссылку входа для ${server.name}.`
     );
 
     try {
       return await fetchServerJoinLink(server.joinLinkUrl);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown join-link error';
+      const message =
+        error instanceof Error ? error.message : 'неизвестная ошибка при запросе ссылки входа';
       appendLog(
         reason === 'direct'
-          ? `Прямое подключение не удалось: ${server.name} не отдал lobby link (${message}).`
-          : `Redirect подавлен: ${server.name} не отдал lobby link (${message}).`
+          ? `Прямое подключение не удалось: ${server.name} не отдал ссылку входа (${message}).`
+          : `Переход отменён: ${server.name} не отдал ссылку входа (${message}).`
       );
       return null;
     } finally {
@@ -949,27 +960,27 @@ export default function App({ config }: AppProps) {
         setPlannedSequence(nextRedirectPlan);
 
         if (nextSnapshot.errors.length) {
-          nextSnapshot.errors.forEach((error) => appendLog(`Ошибка exporter: ${error}`));
+          nextSnapshot.errors.forEach((error) => appendLog(`Ошибка экспортера: ${error}`));
         }
 
         appendLog(
-          `Snapshot ${source === 'manual' ? 'fetched' : 'updated'}: target=${
-            nextRedirectPlan[0]?.name || nextSelection.targetServer?.name || 'none'
-          }, mode=${testModeEnabled ? 'test' : nextSelection.nightMode ? 'night' : 'day'}`
+          `Снимок ${source === 'manual' ? 'получен' : 'обновлён'}: цель=${
+            nextRedirectPlan[0]?.name || nextSelection.targetServer?.name || 'нет'
+          }, режим=${testModeEnabled ? 'тест' : nextSelection.nightMode ? 'ночь' : 'день'}`
         );
 
         if (!enabledRef.current) return;
 
         if (!permissionsRef.current?.popupAllowed || !permissionsRef.current?.steamProtocolReady) {
-          appendLog('Redirect подавлен: нет подтверждённых browser permissions.');
+          appendLog('Переход отменён: браузерные разрешения не подтверждены.');
           return;
         }
 
         if (!nextRedirectPlan[0]) {
           appendLog(
             testModeEnabled
-              ? 'Redirect подавлен: тестовый режим пока не готов.'
-              : 'Redirect подавлен: нет подходящего сервера.'
+              ? 'Переход отменён: тестовый режим пока не готов.'
+              : 'Переход отменён: нет подходящего сервера.'
           );
           return;
         }
@@ -988,7 +999,7 @@ export default function App({ config }: AppProps) {
             return;
           }
 
-          appendLog('Redirect подавлен: предыдущий redirect ещё готовится.');
+          appendLog('Переход отменён: предыдущий переход ещё готовится.');
           return;
         }
 
@@ -997,7 +1008,7 @@ export default function App({ config }: AppProps) {
           !productionTargetChanged &&
           nextSnapshot.timestamp <= lastProcessedTimestampRef.current
         ) {
-          appendLog('Redirect подавлен: snapshot уже обработан.');
+          appendLog('Переход отменён: этот снимок уже обработан.');
           return;
         }
 
@@ -1006,7 +1017,7 @@ export default function App({ config }: AppProps) {
           !productionTargetChanged &&
           Date.now() < cooldownUntilRef.current
         ) {
-          appendLog('Redirect подавлен: активен cooldown.');
+          appendLog('Переход отменён: ещё действует пауза между переходами.');
           return;
         }
 
@@ -1015,7 +1026,7 @@ export default function App({ config }: AppProps) {
             findServerBySelectionKey(nextSnapshot, activeRedirectServerKey) ||
             findServerBySelectionKey(snapshot, activeRedirectServerKey);
           appendLog(
-            `Боевой режим: target сменился c ${previousServer?.name || 'предыдущего сервера'} на ${nextRedirectPlan[0].name}, cooldown пропускаем.`
+            `Боевой режим: цель сменилась с ${previousServer?.name || 'предыдущего сервера'} на ${nextRedirectPlan[0].name}, паузу пропускаем.`
           );
         }
 
@@ -1025,9 +1036,9 @@ export default function App({ config }: AppProps) {
           testModeEnabled ? testCooldownMs : nextPolicy.cooldownMs
         );
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown snapshot error';
+        const message = error instanceof Error ? error.message : 'неизвестная ошибка снимка';
         setFatalError(message);
-        appendLog(`Snapshot processing failed: ${message}`);
+        appendLog(`Ошибка обработки снимка: ${message}`);
       }
     }
   );
@@ -1078,8 +1089,8 @@ export default function App({ config }: AppProps) {
       if (!connectorWindowWriteBlockedRef.current) {
         appendLog(
           phase === 'redirect_sent'
-            ? 'Не удалось обновить окно коннектора после redirect.'
-            : 'Не удалось обновить окно коннектора перед redirect.'
+            ? 'Не удалось обновить окно коннектора после перехода.'
+            : 'Не удалось обновить окно коннектора перед переходом.'
         );
       }
       connectorWindowWriteBlockedRef.current = true;
@@ -1160,7 +1171,7 @@ export default function App({ config }: AppProps) {
   ): Promise<string | null> => {
     const connectorWindow = ensureConnectorWindow();
     if (!connectorWindow) {
-      appendLog('Redirect подавлен: не удалось подготовить служебное окно.');
+      appendLog('Переход отменён: не удалось подготовить служебное окно.');
       return null;
     }
 
@@ -1189,8 +1200,8 @@ export default function App({ config }: AppProps) {
           connectorWindow.focus();
           appendLog(
             followupServer
-              ? `Redirect отправлен в Steam для ${server.name}. Явного ответа от Steam/Squad браузер не получает.`
-              : `Redirect отправлен в Steam для ${server.name}. Дальше ждём только новый snapshot.`
+              ? `Переход отправлен в Steam для ${server.name}. Отдельного ответа от Steam или Squad браузер не получит.`
+              : `Переход отправлен в Steam для ${server.name}. Дальше ждём только новый снимок.`
           );
           connectorWindowStateRef.current = {
             serverKey: getServerSelectionKey(server),
@@ -1207,13 +1218,13 @@ export default function App({ config }: AppProps) {
             );
           }, 1200);
         } catch {
-          appendLog('Redirect подавлен: браузер не дал обновить служебное окно.');
+          appendLog('Переход отменён: браузер не дал обновить служебное окно.');
         }
       }, 40);
 
       return joinLink;
     } catch {
-      appendLog('Redirect подавлен: браузер не дал обновить служебное окно.');
+      appendLog('Переход отменён: браузер не дал обновить служебное окно.');
       return null;
     }
   };
@@ -1230,7 +1241,7 @@ export default function App({ config }: AppProps) {
 
     setPendingSequence({ remaining, nextRedirectAt });
     appendLog(
-      `Запланирован follow-up redirect через ${Math.ceil(nextDelayMs / 1000)} s: ${scheduledNextServer.name}`
+      `Запланирован следующий переход через ${Math.ceil(nextDelayMs / 1000)} с: ${scheduledNextServer.name}`
     );
 
     sequenceTimerRef.current = window.setTimeout(() => {
@@ -1239,7 +1250,7 @@ export default function App({ config }: AppProps) {
 
       void (async () => {
         if (!enabledRef.current) {
-          appendLog(`Follow-up redirect пропущен: автоконнектор уже выключен.`);
+          appendLog(`Следующий переход пропущен: автоконнектор уже выключен.`);
           return;
         }
 
@@ -1250,7 +1261,7 @@ export default function App({ config }: AppProps) {
           return;
         }
 
-        appendLog(`Follow-up redirect triggered: ${latestNextServer.name}`);
+        appendLog(`Следующий переход запущен: ${latestNextServer.name}`);
         scheduleSequenceStep(tail);
       })();
     }, nextDelayMs);
@@ -1276,12 +1287,12 @@ export default function App({ config }: AppProps) {
     testSequenceDelayMsRef.current = nextDelayMs;
     setTestSequenceDelayMsOverride(nextDelayMs);
     saveTestSequenceDelayMs(nextDelayMs);
-    appendLog(`Тестовая задержка follow-up обновлена: ${nextSeconds} s.`);
+    appendLog(`Тестовая задержка следующего перехода обновлена: ${nextSeconds} с.`);
 
     if (pendingRemaining.length && enabledRef.current && modeRef.current === 'test') {
       clearPendingSequence();
       scheduleSequenceStep(pendingRemaining);
-      appendLog(`Ожидающий follow-up redirect пересоздан с новой задержкой.`);
+      appendLog(`Ожидающий следующий переход пересоздан с новой задержкой.`);
     }
   };
 
@@ -1292,13 +1303,13 @@ export default function App({ config }: AppProps) {
     setTestSequenceDelayMsOverride(0);
     saveTestSequenceDelayMs(0);
     appendLog(
-      `Тестовая задержка follow-up сброшена к конфигу: ${configuredTestSequenceDelaySeconds} s.`
+      `Тестовая задержка следующего перехода сброшена к конфигу: ${configuredTestSequenceDelaySeconds} с.`
     );
 
     if (pendingRemaining.length && enabledRef.current && modeRef.current === 'test') {
       clearPendingSequence();
       scheduleSequenceStep(pendingRemaining);
-      appendLog(`Ожидающий follow-up redirect пересоздан с задержкой из конфига.`);
+      appendLog(`Ожидающий следующий переход пересоздан с задержкой из конфига.`);
     }
   };
 
@@ -1307,13 +1318,13 @@ export default function App({ config }: AppProps) {
     setPermissions(result);
     savePermissions(result);
     appendLog(
-      `Проверка браузера: popup=${formatBool(result.popupAllowed)}, steam=${formatBool(result.steamProtocolReady)}`
+      `Проверка браузера: окно=${formatBool(result.popupAllowed)}, Steam=${formatBool(result.steamProtocolReady)}`
     );
   };
 
   const handleDirectJoin = async (server: ExporterServerSnapshot) => {
     if (!canRequestJoinLink(server)) {
-      appendLog(`Прямое подключение недоступно: ${server.name} сейчас offline.`);
+      appendLog(`Прямое подключение недоступно: ${server.name} сейчас оффлайн.`);
       return;
     }
 
@@ -1348,7 +1359,7 @@ export default function App({ config }: AppProps) {
   ): Promise<boolean> => {
     const [firstTarget, ...followups] = redirectPlan;
     if (!firstTarget) {
-      appendLog('Redirect подавлен: нет подходящего сервера.');
+      appendLog('Переход отменён: нет подходящего сервера.');
       return false;
     }
 
@@ -1358,7 +1369,7 @@ export default function App({ config }: AppProps) {
         return false;
       }
 
-      appendLog('Redirect подавлен: предыдущий redirect ещё готовится.');
+      appendLog('Переход отменён: предыдущий переход ещё готовится.');
       return false;
     }
 
@@ -1379,7 +1390,7 @@ export default function App({ config }: AppProps) {
       setCooldownUntil(nextCooldownUntil);
       saveCooldownUntil(nextCooldownUntil);
 
-      appendLog(`Redirect triggered: ${firstTarget.name}`);
+      appendLog(`Переход запущен: ${firstTarget.name}`);
       scheduleSequenceStep(followups);
       return true;
     } finally {
@@ -1398,9 +1409,9 @@ export default function App({ config }: AppProps) {
       const nextSnapshot = await fetchCombinedSnapshot(config.exporters);
       applySnapshot(nextSnapshot, options, 'manual');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown snapshot error';
+      const message = error instanceof Error ? error.message : 'неизвестная ошибка снимка';
       setFatalError(message);
-      appendLog(`Snapshot fetch failed: ${message}`);
+      appendLog(`Не удалось получить снимок: ${message}`);
     } finally {
       setIsFetching(false);
     }
@@ -1413,7 +1424,7 @@ export default function App({ config }: AppProps) {
     const targetServer = selection?.targetServer;
     if (!targetServer) return;
 
-    appendLog(`Периодический reconnect: запрашиваю свежий snapshot для ${targetServer.name}.`);
+    appendLog(`Периодическое переподключение: запрашиваю свежий снимок для ${targetServer.name}.`);
     void refreshSnapshot({ forceRedirect: true });
   });
 
@@ -1432,7 +1443,7 @@ export default function App({ config }: AppProps) {
       const message = 'Браузер не поддерживает EventSource/SSE.';
       setFatalError(message);
       setIsFetching(false);
-      appendLog(`Snapshot stream failed: ${message}`);
+      appendLog(`Поток снимков завершился ошибкой: ${message}`);
       return;
     }
 
@@ -1454,7 +1465,7 @@ export default function App({ config }: AppProps) {
     }
 
     if (!permissions.popupAllowed || !permissions.steamProtocolReady) {
-      appendLog('Автоконнектор не запущен: browser permissions не подтверждены.');
+      appendLog('Автоконнектор не запущен: браузерные разрешения не подтверждены.');
       return;
     }
 
@@ -1496,15 +1507,15 @@ export default function App({ config }: AppProps) {
       ) {
         appendLog(
           isTestModeActive
-            ? 'Тестовый режим: первый redirect запущен сразу из текущего snapshot.'
-            : 'Боевой режим: первый redirect запущен сразу из текущего snapshot.'
+            ? 'Тестовый режим: первый переход запущен сразу из текущего снимка.'
+            : 'Боевой режим: первый переход запущен сразу из текущего снимка.'
         );
         return;
       }
     }
 
     if (immediateRedirectPlan.length && snapshot.timestamp > 0 && !currentSnapshotIsFresh) {
-      appendLog('Текущий snapshot устарел: запрашиваю свежие данные перед первичным redirect.');
+      appendLog('Текущий снимок устарел: запрашиваю свежие данные перед первым переходом.');
     }
 
     void refreshSnapshot({ forceRedirect: true });
@@ -1547,16 +1558,17 @@ export default function App({ config }: AppProps) {
     ? formatCountdown(nextFollowupCountdown)
     : cooldownLeftMs > 0
       ? formatCountdown(cooldownLeftMs)
-      : 'Ready';
+      : 'Готово';
   const nextActionCaption = pendingSequence
-    ? nextFollowupServer?.name || 'Ожидаем follow-up'
+    ? nextFollowupServer?.name || 'Ждём следующий сервер'
     : enabled
-      ? 'Коннектор ждёт новый snapshot'
+      ? 'Коннектор ждёт новый снимок'
       : 'Коннектор выключен';
   const heroMeshLabel = `${liveServerCount}/${snapshot.servers.length || config.exporters.length}`;
   const heroPriorityLabel = effectivePolicy.priorityOrder.join(' → ');
   const heroCadenceLabel =
-    periodicReconnectMs > 0 ? `${Math.round(periodicReconnectMs / 60000)} min cadence` : 'manual';
+    periodicReconnectMs > 0 ? `${Math.round(periodicReconnectMs / 60000)} мин цикл` : 'вручную';
+  const browserCheckLabel = permissionsReady ? 'Браузер проверен' : 'Проверить браузер';
   const orderedServers = useMemo(
     () =>
       snapshot.servers
@@ -1583,7 +1595,7 @@ export default function App({ config }: AppProps) {
         ? 'Оставляй «Боевой» для реальной работы по правилам. «Тест» нужен только чтобы прогнать заранее заданную последовательность серверов.'
         : 'Сейчас доступен только «Боевой» режим, поэтому ничего переключать не нужно.',
       hints: hasConfiguredTestMode
-        ? ['Кнопки: «Боевой» или «Тест»', 'Этот блок определяет сценарий redirect-а']
+        ? ['Кнопки: «Боевой» или «Тест»', 'Этот блок определяет сценарий перехода']
         : ['Кнопка: «Боевой»', 'Тестовый режим не настроен в конфиге']
     },
     {
@@ -1591,21 +1603,21 @@ export default function App({ config }: AppProps) {
       step: '2',
       title: 'Нажми «Проверить браузер»',
       description:
-        'Проверь, что браузер умеет открыть popup и передать ссылку в Steam. Пока оба индикатора не зелёные, автоконнектор не запустится.',
-      hints: ['Кнопка: «Проверить браузер»', 'Смотри статусы Popup и Steam']
+        'Проверь, что браузер умеет открыть служебное окно и передать ссылку в Steam. Пока оба индикатора не зелёные, автоконнектор не запустится.',
+      hints: ['Кнопка: «Проверить браузер»', 'Смотри статусы окна и Steam']
     },
     {
       id: 'connector',
       step: '3',
       title: 'Включи «Автоконнектор»',
       description:
-        'После запуска откроется служебное окно коннектора. Оно занимается запросом свежего lobby link и redirect-ом в Steam и должно оставаться открытым, пока идёт работа. Если после отправки оно осталось на служебной карточке, это нормально: callback от Steam/Squad браузер не получает.',
+        'После запуска откроется служебное окно коннектора. Оно занимается запросом свежей ссылки входа и переходом в Steam и должно оставаться открытым, пока идёт работа. Если после отправки оно осталось на служебной карточке, это нормально: отдельного ответа от Steam или Squad браузер не получает.',
       hints: ['Кнопка: «Автоконнектор»', 'Служебное окно не закрывать']
     },
     {
       id: 'manual',
       step: '4',
-      title: 'Следи за target и, если нужно, жми прямой вход',
+      title: 'Следи за целью и, если нужно, жми прямой вход',
       description:
         'Ниже видно целевой сервер, слабую сторону и карточку выбранного сервера. Если нужен ручной обход автоматики, используй кнопку «Подключиться напрямую».',
       hints: ['Карточки: «Текущая цель» и «Куда заходить»', 'Кнопка в карточке сервера: «Подключиться напрямую»']
@@ -1634,18 +1646,19 @@ export default function App({ config }: AppProps) {
           <div className="hero-topline">
             <div className="hero-brand">
               <div className="hero-logo-shell">
-                <img className="hero-logo" src={projectLogo} alt={`${config.app.title} logo`} />
+                <img className="hero-logo" src={projectLogo} alt={`Логотип ${config.app.title}`} />
               </div>
               <div className="hero-brand-copy">
                 <span className="hero-brand-kicker">Mdj BSS</span>
-                <span className="hero-brand-subtitle">auto-connect control room</span>
+                <span className="hero-brand-subtitle">пульт автоподключения</span>
               </div>
             </div>
 
             <InlineHelp
               label="Справка по главному экрану"
               title="Основное окно AutoSeed"
-              description="Главный экран. Здесь включается автоконнектор, выбирается режим, виден target, состояния браузера и exporter-ов."
+              description="Главный экран. Здесь включается автоконнектор, выбирается режим, видна цель и состояния браузера с экспортерами."
+              testId="hero-help"
             />
           </div>
 
@@ -1657,10 +1670,10 @@ export default function App({ config }: AppProps) {
           </p>
 
           <div className="hero-ribbon" data-testid="hero-ribbon">
-            <span className="hero-ribbon-tag">Live Ops</span>
+            <span className="hero-ribbon-tag">Онлайн</span>
             <p>
-              Control room работает от публичного snapshot, а свежий lobby link забирает только в
-              момент реального перехода.
+              Пульт работает от публичного снимка, а свежую ссылку входа забирает только в момент
+              реального перехода.
             </p>
           </div>
 
@@ -1688,17 +1701,17 @@ export default function App({ config }: AppProps) {
 
           <div className="hero-glance-grid" data-testid="hero-glance-grid">
             <article className="hero-glance-card hero-glance-card-emphasis">
-              <span className="hero-glance-label">Live mesh</span>
+              <span className="hero-glance-label">Контур</span>
               <strong>{heroMeshLabel}</strong>
-              <p>server nodes online</p>
+              <p>узлов сейчас в сети</p>
             </article>
             <article className="hero-glance-card">
-              <span className="hero-glance-label">Next action</span>
+              <span className="hero-glance-label">Следующее действие</span>
               <strong>{nextActionValue}</strong>
               <p>{nextActionCaption}</p>
             </article>
             <article className="hero-glance-card">
-              <span className="hero-glance-label">Priority rail</span>
+              <span className="hero-glance-label">Приоритет</span>
               <strong>{heroPriorityLabel}</strong>
               <p>{heroCadenceLabel}</p>
             </article>
@@ -1757,14 +1770,19 @@ export default function App({ config }: AppProps) {
 
           <div className="control-actions">
             <button
-              className="button button-primary guide-button guide-focus guide-focus-primary"
+              className={classNames(
+                'button',
+                'guide-button',
+                'guide-focus',
+                permissionsReady ? 'button-success guide-focus-success' : 'button-primary guide-focus-primary'
+              )}
               onClick={() => void handlePermissionsCheck()}
               data-testid="check-browser-button"
             >
               <span className="guide-inline-step" aria-hidden="true">
                 2
               </span>
-              <span>Проверить браузер</span>
+              <span>{browserCheckLabel}</span>
             </button>
             <button
               className="button"
@@ -1778,7 +1796,7 @@ export default function App({ config }: AppProps) {
           {hasConfiguredTestMode && isTestModeActive ? (
             <div className="test-delay-card">
               <label className="delay-field">
-                <span>Follow-up</span>
+                <span>Следом</span>
                 <input
                   className="delay-input"
                   type="number"
@@ -1810,14 +1828,15 @@ export default function App({ config }: AppProps) {
                   )}
                 />
                 <div>
-                  <strong>Popup</strong>
+                  <strong>Окно</strong>
                   <p>{permissions?.popupAllowed ? 'готов' : 'не готов'}</p>
                 </div>
               </div>
               <InlineHelp
-                label="Что делает popup"
+                label="Что делает окно"
                 title="Служебное окно коннектора"
-                description="Открывается после включения автоконнектора. Оно нужно только для запроса свежего lobby link, redirect-а в Steam и follow-up переходов. После отправки lobby link окно может визуально остаться на служебной карточке: Steam/Squad не присылают браузеру отдельный callback."
+                description="Открывается после включения автоконнектора. Оно нужно только для запроса свежей ссылки входа, перехода в Steam и последующих переходов. После отправки ссылки окно может визуально остаться на служебной карточке: Steam и Squad не присылают браузеру отдельный ответ."
+                testId="popup-help"
               />
             </div>
             <div className="signal-card signal-card-with-help">
@@ -1835,8 +1854,9 @@ export default function App({ config }: AppProps) {
               </div>
               <InlineHelp
                 label="Что значит Steam"
-                title="Steam / Squad"
-                description="Это финальная точка подключения. Держи Squad открытым в главном меню, чтобы redirect в клиент проходил быстрее и стабильнее."
+                title="Steam и Squad"
+                description="Это финальная точка подключения. Держи Squad открытым в главном меню, чтобы переход в клиент проходил быстрее и стабильнее."
+                testId="steam-help"
               />
             </div>
             <div className="signal-card">
@@ -1849,7 +1869,7 @@ export default function App({ config }: AppProps) {
                 )}
               />
               <div>
-                <strong>Exporter</strong>
+                <strong>Экспортеры</strong>
                 <p>
                   {healthyExporterCount}/{config.exporters.length}
                 </p>
@@ -1863,7 +1883,7 @@ export default function App({ config }: AppProps) {
                 )}
               />
               <div>
-                <strong>Target</strong>
+                <strong>Цель</strong>
                 <p>{displayTargetServer ? 'есть' : 'нет'}</p>
               </div>
             </div>
@@ -1879,7 +1899,7 @@ export default function App({ config }: AppProps) {
         <div className="guide-spoiler-body">
           <p className="guide-spoiler-copy">
             Весь сценарий укладывается в четыре действия: выбрать режим, проверить браузер,
-            включить коннектор и при необходимости зайти вручную в нужный target.
+            включить коннектор и при необходимости зайти вручную в нужную цель.
           </p>
 
           <ol className="guide-steps" aria-label="Пошаговая инструкция">
@@ -1917,7 +1937,7 @@ export default function App({ config }: AppProps) {
       <section className="section-shell">
         <div className="section-head">
           <div>
-            <span className="section-eyebrow">Mission Board</span>
+            <span className="section-eyebrow">Сводка</span>
             <h2>Что происходит прямо сейчас</h2>
           </div>
           <p>Сводка по цели, таймингам и общей доступности контура.</p>
@@ -1936,19 +1956,19 @@ export default function App({ config }: AppProps) {
           <article className="overview-card">
             <span className="overview-label">Куда заходить</span>
             <strong>{weakSideSuggestion?.name || 'Стороны пока ровные'}</strong>
-            <p>{weakSideSuggestion ? 'Слабая сторона на текущем target' : 'Ждём состав сторон'}</p>
+            <p>{weakSideSuggestion ? 'Слабая сторона на текущей цели' : 'Ждём состав сторон'}</p>
           </article>
 
           <article className="overview-card">
-            <span className="overview-label">Snapshot</span>
+            <span className="overview-label">Снимок</span>
             <strong>{formatCompactTimestamp(snapshot.generatedAt)}</strong>
             <p>
-              {liveServerCount}/{snapshot.servers.length || config.exporters.length} серверов online
+              {liveServerCount}/{snapshot.servers.length || config.exporters.length} серверов в сети
             </p>
           </article>
 
           <article className="overview-card">
-            <span className="overview-label">{pendingSequence ? 'Следующий переход' : 'Cooldown'}</span>
+            <span className="overview-label">{pendingSequence ? 'Следующий переход' : 'Пауза'}</span>
             <strong>
               {pendingSequence
                 ? formatCountdown(nextFollowupCountdown)
@@ -1958,9 +1978,9 @@ export default function App({ config }: AppProps) {
             </strong>
             <p>
               {pendingSequence
-                ? nextFollowupServer?.name || 'Ожидаем follow-up'
+                ? nextFollowupServer?.name || 'Ждём следующий сервер'
                 : enabled
-                  ? 'Коннектор ждёт новый snapshot'
+                  ? 'Коннектор ждёт новый снимок'
                   : 'Коннектор не активен'}
             </p>
           </article>
@@ -1970,10 +1990,10 @@ export default function App({ config }: AppProps) {
       <section className="section-shell server-switcher">
         <div className="section-head">
           <div>
-            <span className="section-eyebrow">Server Radar</span>
+            <span className="section-eyebrow">Серверы</span>
             <h2>Быстрый выбор узла</h2>
           </div>
-          <p>Выбери карточку ниже, чтобы развернуть полный tactical board сервера.</p>
+          <p>Выбери карточку ниже, чтобы развернуть полную тактическую панель сервера.</p>
         </div>
 
         <div className="server-switcher-track" data-testid="server-switcher-track">
@@ -2012,12 +2032,12 @@ export default function App({ config }: AppProps) {
                         server.online ? 'state-live' : 'state-dead'
                       )}
                     >
-                      {server.online ? 'online' : 'offline'}
+                      {server.online ? 'в сети' : 'оффлайн'}
                     </span>
                   </div>
                   <div className="server-switcher-meta">
                     <span>{server.playerCount}/{server.maxPlayers || '—'}</span>
-                    {isTarget ? <span className="server-switcher-accent">target</span> : null}
+                    {isTarget ? <span className="server-switcher-accent">цель</span> : null}
                   </div>
                   <p>{switcherHoursLine}</p>
                 </button>
@@ -2031,10 +2051,10 @@ export default function App({ config }: AppProps) {
                     data-testid={`direct-join-${server.id}`}
                   >
                     {joinRequestPending
-                      ? 'Запрашиваем lobby...'
+                      ? 'Запрашиваем ссылку...'
                       : canDirectJoin
                         ? 'Подключиться'
-                        : 'Сервер offline'}
+                        : 'Сервер оффлайн'}
                   </button>
                 </div>
               </article>
@@ -2046,8 +2066,8 @@ export default function App({ config }: AppProps) {
       <section className="section-shell server-stack">
         <div className="section-head">
           <div>
-            <span className="section-eyebrow">Server Detail</span>
-            <h2>Текущий tactical board</h2>
+            <span className="section-eyebrow">Выбранный сервер</span>
+            <h2>Текущая тактическая панель</h2>
           </div>
           <p>Нагрузка, прогресс рассида, состав сторон и лидерские часы по выбранному серверу.</p>
         </div>
@@ -2080,7 +2100,8 @@ export default function App({ config }: AppProps) {
                       <InlineHelp
                         label="Справка по карточке сервера"
                         title="Карточка выбранного сервера"
-                        description="Это главный target-блок ниже переключателя серверов. Здесь видно текущий онлайн, прогресс рассида, слабую сторону и ручную кнопку входа."
+                        description="Это главный блок цели ниже переключателя серверов. Здесь видно текущий онлайн, прогресс рассида, слабую сторону и ручную кнопку входа."
+                        testId="server-help"
                       />
                     </div>
                     <div className="server-chip-row">
@@ -2090,7 +2111,7 @@ export default function App({ config }: AppProps) {
                           server.online ? 'state-live' : 'state-dead'
                         )}
                       >
-                        {server.online ? 'online' : 'offline'}
+                        {server.online ? 'в сети' : 'оффлайн'}
                       </span>
                       <span
                         className={classNames(
@@ -2098,11 +2119,11 @@ export default function App({ config }: AppProps) {
                           server.isSeedCandidate ? 'state-live' : 'state-dead'
                         )}
                       >
-                        seed
+                        сид
                       </span>
-                      <span className="server-state state-join">join on demand</span>
+                      <span className="server-state state-join">вход по запросу</span>
                       {isSameServer(server, displayTargetServer) ? (
-                        <span className="server-state state-target">target</span>
+                        <span className="server-state state-target">цель</span>
                       ) : null}
                     </div>
                   </div>
@@ -2124,10 +2145,10 @@ export default function App({ config }: AppProps) {
                       </span>
                       <span>
                         {joinRequestPending
-                          ? 'Запрашиваем lobby...'
+                          ? 'Запрашиваем ссылку...'
                           : canDirectJoin
                             ? 'Подключиться напрямую'
-                            : 'Сервер offline'}
+                            : 'Сервер оффлайн'}
                       </span>
                     </button>
                   </div>
@@ -2141,7 +2162,7 @@ export default function App({ config }: AppProps) {
                     </strong>
                   </div>
                   <div className="server-metric">
-                    <span>Seed progress</span>
+                    <span>Прогресс сида</span>
                     <strong>
                       {server.playerCount}/{seedLimit || '—'}
                     </strong>
@@ -2210,7 +2231,7 @@ export default function App({ config }: AppProps) {
                 {teamTwo ? <TeamPanel team={teamTwo} opponent={teamOne || null} /> : null}
                 {!teamOne && !teamTwo ? (
                   <div className="team-panel team-panel-empty">
-                    Состав сторон пока не поступил из exporter-а.
+                    Состав сторон пока не поступил из экспортера.
                   </div>
                 ) : null}
               </div>
@@ -2218,18 +2239,22 @@ export default function App({ config }: AppProps) {
           );
         })() : (
           <article className="server-board">
-            <div className="roster-empty">Серверы пока не пришли из exporter-а.</div>
+            <div className="roster-empty">Серверы пока не пришли из экспортера.</div>
           </article>
         )}
       </section>
 
-      <details className="panel panel-span panel-details" data-testid="diagnostics-panel">
-        <summary className="details-summary">
+      <section className="panel panel-span panel-details" data-testid="diagnostics-panel">
+        <div className="details-summary panel-section-head">
           <span>Правила и диагностика</span>
           {diagnosticsIssueCount > 0 ? (
             <span className="badge badge-muted">{diagnosticsIssueCount}</span>
           ) : null}
-        </summary>
+        </div>
+        <p className="panel-section-copy">
+          Блок всегда открыт: здесь сразу видны текущие правила выбора цели, время последних
+          обновлений и возможные ошибки.
+        </p>
         <div className="diagnostics-grid">
           <div className="summary-stack">
             <div className="summary-row">
@@ -2237,7 +2262,7 @@ export default function App({ config }: AppProps) {
               <strong>{productionMode ? 'Боевой' : `Тест ${testSequencePlanLabel}`}</strong>
             </div>
             <div className="summary-row">
-              <span>Последний snapshot</span>
+              <span>Последний снимок</span>
               <strong>{formatTimestamp(snapshot.generatedAt)}</strong>
             </div>
             <div className="summary-row">
@@ -2262,20 +2287,20 @@ export default function App({ config }: AppProps) {
               </strong>
             </div>
             <div className="rule-card">
-              <span>Ночной target</span>
+              <span>Ночная цель</span>
               <strong>{effectivePolicy.nightPreferredServerId}</strong>
             </div>
             <div className="rule-card">
-              <span>Лимит seed</span>
+              <span>Лимит сида</span>
               <strong>&lt; {effectivePolicy.maxSeedPlayers}</strong>
             </div>
             <div className="rule-card">
-              <span>Switch delta</span>
+              <span>Порог переключения</span>
               <strong>&gt; {effectivePolicy.switchDelta}</strong>
             </div>
             <div className="rule-card">
-              <span>Realtime</span>
-              <strong>SSE /events + snapshot fallback</strong>
+              <span>Поток данных</span>
+              <strong>SSE /events + запасной снимок</strong>
             </div>
             {hasConfiguredTestMode ? (
               <>
@@ -2284,25 +2309,25 @@ export default function App({ config }: AppProps) {
                   <strong>{testSequencePlanLabel}</strong>
                 </div>
                 <div className="rule-card">
-                  <span>Задержка follow-up</span>
+                  <span>Задержка следующего перехода</span>
                   <strong>
-                    {Math.round(testSequenceDelayMs / 1000)} s
-                    {hasManualTestSequenceDelay ? ' · local' : ''}
+                    {Math.round(testSequenceDelayMs / 1000)} с
+                    {hasManualTestSequenceDelay ? ' · локально' : ''}
                   </strong>
                 </div>
                 <div className="rule-card">
-                  <span>Cooldown теста</span>
-                  <strong>{Math.round(testCooldownMs / 1000)} s</strong>
+                  <span>Пауза теста</span>
+                  <strong>{Math.round(testCooldownMs / 1000)} с</strong>
                 </div>
               </>
             ) : null}
           </div>
         </div>
-      </details>
+      </section>
 
       <details className="panel panel-span panel-details" data-testid="debug-log-panel">
         <summary className="details-summary">
-          <span>Debug log</span>
+          <span>Журнал событий</span>
           {debugLogCount > 0 ? <span className="badge badge-muted">{debugLogCount}</span> : null}
         </summary>
         <div className="log-box">

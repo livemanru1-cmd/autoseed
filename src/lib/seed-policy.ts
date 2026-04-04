@@ -121,6 +121,6 @@ export function buildSelectionState(
 export function getSelectionStatusLabel(selection: SelectionState | null): string {
   if (!selection) return 'Ожидание обновления данных';
   return selection.reason === 'target_found'
-    ? 'Подходящий seed-сервер найден'
-    : 'Подходящий seed-сервер не найден';
+    ? 'Подходящий сервер для рассида найден'
+    : 'Подходящий сервер для рассида не найден';
 }

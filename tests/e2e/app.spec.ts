@@ -187,12 +187,54 @@ async function mockAutoseedApi(page: Page, counters?: { joinLinkRequests: number
     route.fulfill({
       status: 200,
       contentType: 'text/html; charset=utf-8',
-      body: '<!doctype html><html><body><main data-testid="redirect-target">Redirect target</main></body></html>'
+      body: '<!doctype html><html><body><main data-testid="redirect-target">Точка перехода</main></body></html>'
     })
   );
 }
 
-test('renders the redesigned command room from exporter snapshots', async ({ page }) => {
+async function mockSuccessfulPermissionCheck(page: Page) {
+  await page.addInitScript(() => {
+    window.open = () =>
+      ({
+        document: {
+          write() {},
+          close() {}
+        },
+        close() {},
+        focus() {},
+        closed: false
+      }) as unknown as Window;
+
+    const originalCreateElement = Document.prototype.createElement;
+    Document.prototype.createElement = function (
+      tagName: string,
+      options?: ElementCreationOptions
+    ) {
+      const element = originalCreateElement.call(this, tagName, options);
+
+      if (tagName.toLowerCase() === 'iframe') {
+        let currentSrc = '';
+
+        Object.defineProperty(element, 'src', {
+          configurable: true,
+          get() {
+            return currentSrc;
+          },
+          set(value) {
+            currentSrc = String(value);
+            window.setTimeout(() => {
+              window.dispatchEvent(new Event('blur'));
+            }, 0);
+          }
+        });
+      }
+
+      return element;
+    };
+  });
+}
+
+test('renders the localized control room from exporter snapshots', async ({ page }) => {
   await mockAutoseedApi(page);
 
   await page.goto('/');
@@ -202,7 +244,9 @@ test('renders the redesigned command room from exporter snapshots', async ({ pag
   await expect(page.getByTestId('overview-target')).toContainText('[RU] BSS Spec Ops');
   await expect(page.getByTestId('server-card-1')).toContainText('[RU] BSS Classic');
   await expect(page.getByTestId('server-card-2')).toContainText('[RU] BSS Spec Ops');
-  await expect(page.getByTestId('active-server-board')).toContainText('join on demand');
+  await expect(page.getByTestId('active-server-board')).toContainText('вход по запросу');
+  await expect(page.getByTestId('diagnostics-panel')).toContainText('Правила и диагностика');
+  await expect(page.getByTestId('diagnostics-panel')).toContainText('Последний снимок');
 });
 
 test('requests join-link on demand and navigates only after the user action', async ({ page }) => {
@@ -219,7 +263,37 @@ test('requests join-link on demand and navigates only after the user action', as
   ]);
 
   expect(counters.joinLinkRequests).toBe(1);
-  await expect(page.getByTestId('redirect-target')).toHaveText('Redirect target');
+  await expect(page.getByTestId('redirect-target')).toHaveText('Точка перехода');
+});
+
+test('marks browser check as successful and keeps the button green', async ({ page }) => {
+  await mockSuccessfulPermissionCheck(page);
+  await mockAutoseedApi(page);
+
+  await page.goto('/');
+
+  const button = page.getByTestId('check-browser-button');
+  await button.click();
+
+  await expect(button).toContainText('Браузер проверен');
+  await expect(button).toHaveClass(/button-success/);
+  await expect(page.getByText('Браузер готов')).toBeVisible();
+  await expect(page.getByTestId('hero')).toContainText('Браузер готов');
+});
+
+test('keeps help popovers visible inside the viewport on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockAutoseedApi(page);
+
+  await page.goto('/');
+
+  await page.getByTestId('hero-help-trigger').click();
+  await expect(page.getByTestId('hero-help-popover')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+
+  await page.getByTestId('popup-help-trigger').click();
+  await expect(page.getByTestId('popup-help-popover')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });
 
 test('keeps the layout usable on mobile without document-level horizontal overflow', async ({
