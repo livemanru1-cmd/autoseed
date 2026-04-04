@@ -88,7 +88,6 @@
   "isSeedCandidate": true,
   "squadbrowserApiKey": "${SQUADBROWSER_API_KEY}",
   "squadbrowserTimeoutMs": 4000,
-  "squadbrowserJoinLinkTtlMs": 300000,
   "corsOrigins": ["*"],
   "staleAfterMs": 90000,
   "rateLimitWindowMs": 60000,
@@ -101,7 +100,7 @@
 - `SQUAD_HOST`: адрес, куда сам SquadJS ходит за A2S/RCON.
 - `SQUADBROWSER_API_KEY`: ключ для `POST /pub/join-link`.
 
-По умолчанию exporter ходит в `https://endback.squadbrowser.app/api` и по `SQUADBROWSER_API_KEY` получает join lobby link через `Squadbrowser API` по exact server name. Если `Squadbrowser` не ответил валидным lobby link, exporter возвращает `joinLink: null`, а frontend должен считать автоконнектор неготовым.
+По умолчанию exporter ходит в `https://endback.squadbrowser.app/api` и по `SQUADBROWSER_API_KEY` получает join lobby link через `Squadbrowser API` по exact server name. Важно: lookup делается только по запросу на `GET {baseUrl}/join-link`. `snapshot` и `events` больше не должны триггерить запросы в `Squadbrowser API`. Если `Squadbrowser` не ответил валидным lobby link, exporter возвращает ошибку `503`, а frontend просто не делает redirect.
 
 ## 3. Что менять при переносе на другие IP и серверы
 
@@ -257,7 +256,7 @@ networks:
 - запись в БД
 - websocket
 
-Exporter read-only и нужен только для `GET {baseUrl}/healthz`, `GET {baseUrl}/snapshot` и `GET {baseUrl}/events` из браузера GitHub Pages.
+Exporter read-only и нужен только для `GET {baseUrl}/healthz`, `GET {baseUrl}/snapshot`, `GET {baseUrl}/events` и `GET {baseUrl}/join-link` из браузера GitHub Pages.
 
 ### Вариант без reverse proxy
 
@@ -309,8 +308,10 @@ services:
 ```bash
 curl -s https://api.squad.leo-land.ru/squadjs1/v1/autoseed/healthz | jq
 curl -s https://api.squad.leo-land.ru/squadjs1/v1/autoseed/snapshot | jq
+curl -s https://api.squad.leo-land.ru/squadjs1/v1/autoseed/join-link | jq
 curl -s https://api.squad.leo-land.ru/squadjs2/v1/autoseed/healthz | jq
 curl -s https://api.squad.leo-land.ru/squadjs2/v1/autoseed/snapshot | jq
+curl -s https://api.squad.leo-land.ru/squadjs2/v1/autoseed/join-link | jq
 ```
 
 ### Проверка GitHub Pages

@@ -84,11 +84,11 @@ export type ExporterServerSnapshot = {
   gameMode?: string;
   isSeedCandidate: boolean;
   online: boolean;
-  joinLink?: string;
   teams: ExporterTeamSnapshot[];
   players: ExporterPlayerSnapshot[];
   updatedAt: number;
   sourceUrl: string;
+  joinLinkUrl: string;
   error?: string | null;
 };
 
@@ -102,7 +102,7 @@ export type ExporterSnapshotTeamResponse = Partial<Omit<ExporterTeamSnapshot, 'p
 };
 
 export type ExporterSnapshotServerResponse = Partial<
-  Omit<ExporterServerSnapshot, 'sourceUrl' | 'error' | 'teams' | 'players'>
+  Omit<ExporterServerSnapshot, 'sourceUrl' | 'joinLinkUrl' | 'error' | 'teams' | 'players'>
 > & {
   teams?: ExporterSnapshotTeamResponse[];
   players?: ExporterSnapshotPlayerResponse[];
@@ -133,6 +133,17 @@ export type BrowserPermissions = {
   popupAllowed: boolean;
   steamProtocolReady: boolean;
   checkedAt: number;
+};
+
+export type ExporterJoinLinkResponse = {
+  ok?: boolean;
+  timestamp?: number;
+  serverId?: number;
+  serverCode?: string;
+  serverName?: string;
+  joinLink?: string;
+  error?: string;
+  message?: string;
 };
 
 export type StoredState = {

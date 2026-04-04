@@ -48,7 +48,7 @@ function isNightWindow(policy: SeedPolicy, date = new Date()): boolean {
 }
 
 function isSuitableSeedCandidate(server: ExporterServerSnapshot): boolean {
-  return server.online && server.isSeedCandidate && Boolean(server.joinLink);
+  return server.online && server.isSeedCandidate;
 }
 
 export function resolveSeedPolicy(fallbackPolicy?: Partial<SeedPolicy> | null): SeedPolicy {

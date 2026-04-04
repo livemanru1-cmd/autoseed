@@ -1,6 +1,7 @@
 import type {
   CombinedSnapshot,
   ExporterEndpointConfig,
+  ExporterJoinLinkResponse,
   ExporterPlayerSnapshot,
   ExporterServerSnapshot,
   ExporterSnapshotPlayerResponse,
@@ -15,6 +16,7 @@ import type {
 type ExporterSnapshotState = {
   name: string;
   snapshotUrl: string;
+  joinLinkUrl: string;
   eventsUrl: string;
   initialized: boolean;
   servers: ExporterServerSnapshot[];
@@ -99,7 +101,11 @@ function mapTeam(team: ExporterSnapshotTeamResponse): ExporterTeamSnapshot {
   };
 }
 
-function mapServer(server: ExporterSnapshotServerResponse, sourceUrl: string): ExporterServerSnapshot {
+function mapServer(
+  server: ExporterSnapshotServerResponse,
+  sourceUrl: string,
+  joinLinkUrl: string
+): ExporterServerSnapshot {
   return {
     id: Number(server.id) || 0,
     code: server.code || `server-${Number(server.id) || 0}`,
@@ -111,11 +117,11 @@ function mapServer(server: ExporterSnapshotServerResponse, sourceUrl: string): E
     gameMode: server.gameMode,
     isSeedCandidate: server.isSeedCandidate !== false,
     online: Boolean(server.online),
-    joinLink: server.joinLink,
     teams: Array.isArray(server.teams) ? server.teams.map(mapTeam) : [],
     players: Array.isArray(server.players) ? server.players.map(mapPlayer) : [],
     updatedAt: Number(server.updatedAt) || Date.now(),
-    sourceUrl
+    sourceUrl,
+    joinLinkUrl
   };
 }
 
@@ -134,6 +140,7 @@ function createExporterSnapshotState(
   return {
     name: exporterConfig.name,
     snapshotUrl: `${baseUrl}/snapshot`,
+    joinLinkUrl: `${baseUrl}/join-link`,
     eventsUrl: `${baseUrl}/events`,
     initialized: false,
     servers: [],
@@ -170,7 +177,7 @@ function applySnapshotPayload(
   state.timestamp = Number(payload.timestamp) || Date.now();
   state.generatedAt = payload.generatedAt || new Date(state.timestamp).toISOString();
   state.servers = Array.isArray(payload.servers)
-    ? payload.servers.map((server) => mapServer(server, state.snapshotUrl))
+    ? payload.servers.map((server) => mapServer(server, state.snapshotUrl, state.joinLinkUrl))
     : [];
 }
 
@@ -244,6 +251,25 @@ async function fetchSnapshotPayload(snapshotUrl: string): Promise<ExporterSnapsh
   }
 
   return (await response.json()) as ExporterSnapshotResponse;
+}
+
+export async function fetchServerJoinLink(joinLinkUrl: string): Promise<string> {
+  const response = await fetch(joinLinkUrl, {
+    headers: SNAPSHOT_HEADERS,
+    cache: 'no-store'
+  });
+
+  if (!response.ok) {
+    throw new Error(await buildHttpError(response));
+  }
+
+  const payload = (await response.json()) as ExporterJoinLinkResponse;
+  const joinLink = typeof payload.joinLink === 'string' ? payload.joinLink.trim() : '';
+  if (!joinLink) {
+    throw new Error('Join link response is missing joinLink.');
+  }
+
+  return joinLink;
 }
 
 export async function fetchCombinedSnapshot(

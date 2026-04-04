@@ -14,7 +14,11 @@ import {
   getSelectionStatusLabel,
   resolveSeedPolicy
 } from './lib/seed-policy';
-import { fetchCombinedSnapshot, subscribeCombinedSnapshot } from './lib/snapshot';
+import {
+  fetchCombinedSnapshot,
+  fetchServerJoinLink,
+  subscribeCombinedSnapshot
+} from './lib/snapshot';
 import {
   loadStoredState,
   saveCooldownUntil,
@@ -205,7 +209,11 @@ function getSeedProgressGradient(percent: number): string {
 }
 
 function canUseRedirectSequenceTarget(server: ExporterServerSnapshot | undefined): boolean {
-  return Boolean(server?.online && server.joinLink);
+  return Boolean(server?.online && server.joinLinkUrl);
+}
+
+function canRequestJoinLink(server: ExporterServerSnapshot | null | undefined): boolean {
+  return Boolean(server?.online && server.joinLinkUrl);
 }
 
 function buildTestSequence(
@@ -346,16 +354,16 @@ function buildConnectorWindowMarkup(context: ConnectorWindowContext): string {
       : 'Передаём lobby link в Steam';
   const leadText =
     phase === 'redirect_sent'
-      ? 'Браузер не получает явный ответ от Steam или Squad. Если это окно осталось на служебной карточке, это нормально. Данные ниже и актуальный joinLink обновляются по новым snapshot.'
-      : 'Держи Squad открытым в главном меню. Окно нужно только для redirect в Steam.';
+      ? 'Браузер не получает явный ответ от Steam или Squad. Если это окно осталось на служебной карточке, это нормально. Каждый следующий redirect заново запросит свежий lobby link.'
+      : 'Держи Squad открытым в главном меню. Окно нужно только для запроса lobby link и redirect в Steam.';
   const nextStepLabel = hasFollowup ? 'Follow-up' : 'Дальше';
   const nextStepText = hasFollowup
     ? `Следом: ${escapeHtml(followupServer!.name)} через ${Math.ceil(followupDelayMs / 1000)} s`
     : phase === 'redirect_sent'
-      ? 'Автоконнектор ждёт новый snapshot. Окно оставьте открытым.'
+      ? 'Автоконнектор ждёт новый snapshot. Перед следующим переходом lobby link будет запрошен заново.'
       : 'После отправки браузер не получит отдельный callback от Steam или Squad.';
   const snapshotText = formatCompactTimestamp(server.updatedAt);
-  const joinLinkText = server.joinLink ? 'Готов, обновляется по snapshot' : 'Ещё не готов';
+  const joinLinkText = 'Запрашивается перед каждым переходом';
 
   return `<!doctype html>
 <html lang="ru">
@@ -759,6 +767,7 @@ export default function App({ config }: AppProps) {
   const [logs, setLogs] = useState<string[]>([]);
   const [now, setNow] = useState<number>(Date.now());
   const [activeServerKey, setActiveServerKey] = useState<string>('');
+  const [joinLinkRequestServerKey, setJoinLinkRequestServerKey] = useState<string>('');
 
   const enabledRef = useRef(enabled);
   const modeRef = useRef(mode);
@@ -773,7 +782,8 @@ export default function App({ config }: AppProps) {
   const connectorWindowStateRef = useRef<ConnectorWindowState | null>(null);
   const connectorWindowWriteBlockedRef = useRef<boolean>(false);
   const activeRedirectServerKeyRef = useRef<string>('');
-  const activeRedirectJoinLinkRef = useRef<string>('');
+  const redirectInFlightRef = useRef<boolean>(false);
+  const pendingRedirectServerKeyRef = useRef<string>('');
 
   useEffect(() => {
     enabledRef.current = enabled;
@@ -854,6 +864,44 @@ export default function App({ config }: AppProps) {
       return next.slice(Math.max(0, next.length - debugLogLimit));
     });
   };
+  const isJoinLinkRequestPending = (server: ExporterServerSnapshot | null | undefined): boolean =>
+    Boolean(server && getServerSelectionKey(server) === joinLinkRequestServerKey);
+
+  const requestFreshJoinLink = async (
+    server: ExporterServerSnapshot,
+    reason: 'redirect' | 'direct'
+  ): Promise<string | null> => {
+    if (!canRequestJoinLink(server)) {
+      appendLog(
+        reason === 'direct'
+          ? `Прямое подключение недоступно: ${server.name} сейчас offline.`
+          : `Redirect подавлен: ${server.name} сейчас offline.`
+      );
+      return null;
+    }
+
+    const serverKey = getServerSelectionKey(server);
+    setJoinLinkRequestServerKey(serverKey);
+    appendLog(
+      reason === 'direct'
+        ? `Прямое подключение: запрашиваю свежий lobby link для ${server.name}.`
+        : `Запрашиваю свежий lobby link для ${server.name}.`
+    );
+
+    try {
+      return await fetchServerJoinLink(server.joinLinkUrl);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown join-link error';
+      appendLog(
+        reason === 'direct'
+          ? `Прямое подключение не удалось: ${server.name} не отдал lobby link (${message}).`
+          : `Redirect подавлен: ${server.name} не отдал lobby link (${message}).`
+      );
+      return null;
+    } finally {
+      setJoinLinkRequestServerKey((current) => (current === serverKey ? '' : current));
+    }
+  };
 
   const testModeConfig = config.app.testMode;
   const activeMode: AppMode = hasConfiguredTestMode ? mode : 'production';
@@ -917,38 +965,36 @@ export default function App({ config }: AppProps) {
           return;
         }
 
-        if (!nextRedirectPlan[0]?.joinLink) {
+        if (!nextRedirectPlan[0]) {
           appendLog(
             testModeEnabled
               ? 'Redirect подавлен: тестовый режим пока не готов.'
-              : 'Redirect подавлен: нет подходящего сервера или joinLink.'
+              : 'Redirect подавлен: нет подходящего сервера.'
           );
           return;
         }
 
         const nextTargetKey = getServerSelectionKey(nextRedirectPlan[0]);
         const activeRedirectServerKey = activeRedirectServerKeyRef.current;
-        const activeRedirectJoinLink = activeRedirectJoinLinkRef.current;
         const productionTargetChanged = Boolean(
           !testModeEnabled &&
             nextTargetKey &&
             activeRedirectServerKey &&
             nextTargetKey !== activeRedirectServerKey
         );
-        const productionJoinLinkChanged = Boolean(
-          !testModeEnabled &&
-            nextTargetKey &&
-            activeRedirectServerKey &&
-            nextTargetKey === activeRedirectServerKey &&
-            nextRedirectPlan[0].joinLink &&
-            activeRedirectJoinLink &&
-            nextRedirectPlan[0].joinLink !== activeRedirectJoinLink
-        );
+
+        if (redirectInFlightRef.current) {
+          if (nextTargetKey && pendingRedirectServerKeyRef.current === nextTargetKey) {
+            return;
+          }
+
+          appendLog('Redirect подавлен: предыдущий redirect ещё готовится.');
+          return;
+        }
 
         if (
           !options?.forceRedirect &&
           !productionTargetChanged &&
-          !productionJoinLinkChanged &&
           nextSnapshot.timestamp <= lastProcessedTimestampRef.current
         ) {
           appendLog('Redirect подавлен: snapshot уже обработан.');
@@ -958,7 +1004,6 @@ export default function App({ config }: AppProps) {
         if (
           !options?.forceRedirect &&
           !productionTargetChanged &&
-          !productionJoinLinkChanged &&
           Date.now() < cooldownUntilRef.current
         ) {
           appendLog('Redirect подавлен: активен cooldown.');
@@ -974,13 +1019,7 @@ export default function App({ config }: AppProps) {
           );
         }
 
-        if (productionJoinLinkChanged) {
-          appendLog(
-            `Боевой режим: у ${nextRedirectPlan[0].name} обновился joinLink, отправляю новый redirect без ожидания cooldown.`
-          );
-        }
-
-        startRedirectPlan(
+        void startRedirectPlan(
           nextRedirectPlan,
           nextSnapshot.timestamp,
           testModeEnabled ? testCooldownMs : nextPolicy.cooldownMs
@@ -1115,19 +1154,14 @@ export default function App({ config }: AppProps) {
     syncConnectorWindow(snapshot, plannedSequence);
   }, [enabled, pendingSequence, plannedSequence, snapshot]);
 
-  const triggerJoinLink = (
+  const triggerJoinLink = async (
     server: ExporterServerSnapshot,
     followupServer?: ExporterServerSnapshot | null
-  ): boolean => {
-    if (!server.joinLink) {
-      appendLog(`Redirect подавлен: у ${server.name} нет joinLink.`);
-      return false;
-    }
-
+  ): Promise<string | null> => {
     const connectorWindow = ensureConnectorWindow();
     if (!connectorWindow) {
       appendLog('Redirect подавлен: не удалось подготовить служебное окно.');
-      return false;
+      return null;
     }
 
     try {
@@ -1143,9 +1177,15 @@ export default function App({ config }: AppProps) {
         'dispatching',
         followupServer ? testSequenceDelayMsRef.current : 0
       );
+
+      const joinLink = await requestFreshJoinLink(server, 'redirect');
+      if (!joinLink) {
+        return null;
+      }
+
       window.setTimeout(() => {
         try {
-          connectorWindow.location.href = server.joinLink!;
+          connectorWindow.location.href = joinLink;
           connectorWindow.focus();
           appendLog(
             followupServer
@@ -1170,10 +1210,11 @@ export default function App({ config }: AppProps) {
           appendLog('Redirect подавлен: браузер не дал обновить служебное окно.');
         }
       }, 40);
-      return true;
+
+      return joinLink;
     } catch {
       appendLog('Redirect подавлен: браузер не дал обновить служебное окно.');
-      return false;
+      return null;
     }
   };
 
@@ -1196,25 +1237,22 @@ export default function App({ config }: AppProps) {
       sequenceTimerRef.current = null;
       setPendingSequence(null);
 
-      if (!enabledRef.current) {
-        appendLog(`Follow-up redirect пропущен: автоконнектор уже выключен.`);
-        return;
-      }
+      void (async () => {
+        if (!enabledRef.current) {
+          appendLog(`Follow-up redirect пропущен: автоконнектор уже выключен.`);
+          return;
+        }
 
-      const latestNextServer =
-        findServerBySelectionKey(snapshotRef.current, nextServerKey) || scheduledNextServer;
+        const latestNextServer =
+          findServerBySelectionKey(snapshotRef.current, nextServerKey) || scheduledNextServer;
+        const dispatchedJoinLink = await triggerJoinLink(latestNextServer, tail[0] || null);
+        if (!dispatchedJoinLink) {
+          return;
+        }
 
-      if (!latestNextServer.joinLink) {
-        appendLog(`Follow-up redirect пропущен: у ${latestNextServer.name} нет joinLink.`);
-        return;
-      }
-
-      if (!triggerJoinLink(latestNextServer, tail[0] || null)) {
-        return;
-      }
-
-      appendLog(`Follow-up redirect triggered: ${latestNextServer.joinLink}`);
-      scheduleSequenceStep(tail);
+        appendLog(`Follow-up redirect triggered: ${latestNextServer.name}`);
+        scheduleSequenceStep(tail);
+      })();
     }, nextDelayMs);
   };
 
@@ -1223,8 +1261,10 @@ export default function App({ config }: AppProps) {
     saveLastProcessedTimestamp(0);
     setCooldownUntil(0);
     saveCooldownUntil(0);
+    setJoinLinkRequestServerKey('');
     activeRedirectServerKeyRef.current = '';
-    activeRedirectJoinLinkRef.current = '';
+    pendingRedirectServerKeyRef.current = '';
+    redirectInFlightRef.current = false;
     connectorWindowStateRef.current = null;
   };
 
@@ -1271,15 +1311,18 @@ export default function App({ config }: AppProps) {
     );
   };
 
-  const handleDirectJoin = (server: ExporterServerSnapshot) => {
-    if (!server.joinLink) {
-      appendLog(`Прямое подключение недоступно: у ${server.name} нет joinLink.`);
+  const handleDirectJoin = async (server: ExporterServerSnapshot) => {
+    if (!canRequestJoinLink(server)) {
+      appendLog(`Прямое подключение недоступно: ${server.name} сейчас offline.`);
       return;
     }
 
+    const joinLink = await requestFreshJoinLink(server, 'direct');
+    if (!joinLink) return;
+
     try {
       appendLog(`Прямое подключение: ${server.name}`);
-      window.location.href = server.joinLink;
+      window.location.href = joinLink;
     } catch {
       appendLog(`Прямое подключение не удалось: браузер заблокировал переход к ${server.name}.`);
     }
@@ -1298,34 +1341,53 @@ export default function App({ config }: AppProps) {
     void refreshSnapshot();
   };
 
-  const startRedirectPlan = (
+  const startRedirectPlan = async (
     redirectPlan: ExporterServerSnapshot[],
     snapshotTimestamp: number,
     cooldownMs: number
-  ): boolean => {
+  ): Promise<boolean> => {
     const [firstTarget, ...followups] = redirectPlan;
-    if (!firstTarget?.joinLink) {
-      appendLog('Redirect подавлен: нет готового joinLink.');
+    if (!firstTarget) {
+      appendLog('Redirect подавлен: нет подходящего сервера.');
       return false;
     }
 
+    const targetServerKey = getServerSelectionKey(firstTarget);
+    if (redirectInFlightRef.current) {
+      if (pendingRedirectServerKeyRef.current === targetServerKey) {
+        return false;
+      }
+
+      appendLog('Redirect подавлен: предыдущий redirect ещё готовится.');
+      return false;
+    }
+
+    redirectInFlightRef.current = true;
+    pendingRedirectServerKeyRef.current = targetServerKey;
     clearPendingSequence();
 
-    if (!triggerJoinLink(firstTarget, followups[0] || null)) {
-      return false;
+    try {
+      const dispatchedJoinLink = await triggerJoinLink(firstTarget, followups[0] || null);
+      if (!dispatchedJoinLink) {
+        return false;
+      }
+
+      const nextCooldownUntil = Date.now() + cooldownMs;
+      activeRedirectServerKeyRef.current = targetServerKey;
+      setLastProcessedTimestamp(snapshotTimestamp);
+      saveLastProcessedTimestamp(snapshotTimestamp);
+      setCooldownUntil(nextCooldownUntil);
+      saveCooldownUntil(nextCooldownUntil);
+
+      appendLog(`Redirect triggered: ${firstTarget.name}`);
+      scheduleSequenceStep(followups);
+      return true;
+    } finally {
+      if (pendingRedirectServerKeyRef.current === targetServerKey) {
+        pendingRedirectServerKeyRef.current = '';
+      }
+      redirectInFlightRef.current = false;
     }
-
-    const nextCooldownUntil = Date.now() + cooldownMs;
-    activeRedirectServerKeyRef.current = getServerSelectionKey(firstTarget);
-    activeRedirectJoinLinkRef.current = firstTarget.joinLink || '';
-    setLastProcessedTimestamp(snapshotTimestamp);
-    saveLastProcessedTimestamp(snapshotTimestamp);
-    setCooldownUntil(nextCooldownUntil);
-    saveCooldownUntil(nextCooldownUntil);
-
-    appendLog(`Redirect triggered: ${firstTarget.joinLink}`);
-    scheduleSequenceStep(followups);
-    return true;
   };
 
   const refreshSnapshot = async (options?: RefreshSnapshotOptions) => {
@@ -1349,7 +1411,7 @@ export default function App({ config }: AppProps) {
     if (isFetchingRef.current) return;
 
     const targetServer = selection?.targetServer;
-    if (!targetServer?.joinLink) return;
+    if (!targetServer) return;
 
     appendLog(`Периодический reconnect: запрашиваю свежий snapshot для ${targetServer.name}.`);
     void refreshSnapshot({ forceRedirect: true });
@@ -1426,7 +1488,7 @@ export default function App({ config }: AppProps) {
 
     if (immediateRedirectPlan.length && currentSnapshotIsFresh) {
       if (
-        startRedirectPlan(
+        await startRedirectPlan(
           immediateRedirectPlan,
           snapshot.timestamp,
           isTestModeActive ? testCooldownMs : effectivePolicy.cooldownMs
@@ -1451,8 +1513,10 @@ export default function App({ config }: AppProps) {
   const handleDisable = () => {
     clearPendingSequence();
     closeConnectorWindow();
+    setJoinLinkRequestServerKey('');
     activeRedirectServerKeyRef.current = '';
-    activeRedirectJoinLinkRef.current = '';
+    pendingRedirectServerKeyRef.current = '';
+    redirectInFlightRef.current = false;
     connectorWindowStateRef.current = null;
     enabledRef.current = false;
     setEnabled(false);
@@ -1521,7 +1585,7 @@ export default function App({ config }: AppProps) {
       step: '3',
       title: 'Включи «Автоконнектор»',
       description:
-        'После запуска откроется служебное окно коннектора. Оно занимается redirect-ом в Steam и должно оставаться открытым, пока идёт работа. Если после отправки оно осталось на служебной карточке, это нормально: callback от Steam/Squad браузер не получает, а сама карточка и актуальный joinLink продолжают обновляться по новым snapshot.',
+        'После запуска откроется служебное окно коннектора. Оно занимается запросом свежего lobby link и redirect-ом в Steam и должно оставаться открытым, пока идёт работа. Если после отправки оно осталось на служебной карточке, это нормально: callback от Steam/Squad браузер не получает.',
       hints: ['Кнопка: «Автоконнектор»', 'Служебное окно не закрывать']
     },
     {
@@ -1704,7 +1768,7 @@ export default function App({ config }: AppProps) {
               <InlineHelp
                 label="Что делает popup"
                 title="Служебное окно коннектора"
-                description="Открывается после включения автоконнектора. Оно нужно только для redirect-а в Steam и для follow-up переходов. После отправки lobby link окно может визуально остаться на служебной карточке: Steam/Squad не присылают браузеру отдельный callback, а карточка и актуальный joinLink обновляются по свежим snapshot."
+                description="Открывается после включения автоконнектора. Оно нужно только для запроса свежего lobby link, redirect-а в Steam и follow-up переходов. После отправки lobby link окно может визуально остаться на служебной карточке: Steam/Squad не присылают браузеру отдельный callback."
               />
             </div>
             <div className="signal-card signal-card-with-help">
@@ -1847,6 +1911,8 @@ export default function App({ config }: AppProps) {
             const serverKey = getServerSelectionKey(server);
             const isActive = serverKey === getServerSelectionKey(activeServer);
             const isTarget = isSameServer(server, displayTargetServer);
+            const canDirectJoin = canRequestJoinLink(server);
+            const joinRequestPending = isJoinLinkRequestPending(server);
             const [leftTeam, rightTeam] = server.teams;
             const switcherHoursLine =
               leftTeam && rightTeam
@@ -1889,10 +1955,14 @@ export default function App({ config }: AppProps) {
                   <button
                     type="button"
                     className="button button-small"
-                    onClick={() => handleDirectJoin(server)}
-                    disabled={!server.joinLink}
+                    onClick={() => void handleDirectJoin(server)}
+                    disabled={!canDirectJoin || joinRequestPending}
                   >
-                    {server.joinLink ? 'Подключиться' : 'Lobby не готов'}
+                    {joinRequestPending
+                      ? 'Запрашиваем lobby...'
+                      : canDirectJoin
+                        ? 'Подключиться'
+                        : 'Сервер offline'}
                   </button>
                 </div>
               </article>
@@ -1904,6 +1974,8 @@ export default function App({ config }: AppProps) {
       <section className="server-stack">
         {activeServer ? (() => {
           const server = activeServer;
+          const canDirectJoin = canRequestJoinLink(server);
+          const joinRequestPending = isJoinLinkRequestPending(server);
           const seedLimit = effectivePolicy.maxSeedPlayers || server.maxPlayers || 0;
           const loadPercent = getServerLoadPercent(server);
           const seedPercent = getSeedProgressPercent(server, seedLimit);
@@ -1947,11 +2019,7 @@ export default function App({ config }: AppProps) {
                       >
                         seed
                       </span>
-                      {server.joinLink ? (
-                        <span className="server-state state-join">join ready</span>
-                      ) : (
-                        <span className="server-state state-dead">no join</span>
-                      )}
+                      <span className="server-state state-join">join on demand</span>
                       {isSameServer(server, displayTargetServer) ? (
                         <span className="server-state state-target">target</span>
                       ) : null}
@@ -1966,14 +2034,18 @@ export default function App({ config }: AppProps) {
                     <button
                       type="button"
                       className="button button-primary guide-button guide-focus guide-focus-accent"
-                      onClick={() => handleDirectJoin(server)}
-                      disabled={!server.joinLink}
+                      onClick={() => void handleDirectJoin(server)}
+                      disabled={!canDirectJoin || joinRequestPending}
                     >
                       <span className="guide-inline-step" aria-hidden="true">
                         4
                       </span>
                       <span>
-                        {server.joinLink ? 'Подключиться напрямую' : 'Lobby link не готов'}
+                        {joinRequestPending
+                          ? 'Запрашиваем lobby...'
+                          : canDirectJoin
+                            ? 'Подключиться напрямую'
+                            : 'Сервер offline'}
                       </span>
                     </button>
                   </div>
