@@ -31,6 +31,18 @@ const runtimeConfig = {
   ]
 };
 
+const testModeRuntimeConfig = {
+  ...runtimeConfig,
+  app: {
+    ...runtimeConfig.app,
+    testMode: {
+      sequenceServerIds: [1, 2],
+      delayMs: 1000,
+      cooldownMs: 50
+    }
+  }
+};
+
 function buildTeam(id: number, name: string, totalPlaytimeHours: number) {
   return {
     id,
@@ -82,7 +94,8 @@ function buildSnapshot({
   playerCount,
   maxPlayers,
   queueLength,
-  online
+  online,
+  timestamp = BASE_TIME
 }: {
   id: number;
   code: string;
@@ -91,11 +104,12 @@ function buildSnapshot({
   maxPlayers: number;
   queueLength: number;
   online: boolean;
+  timestamp?: number;
 }) {
   return {
     success: true,
-    timestamp: BASE_TIME,
-    generatedAt: new Date(BASE_TIME).toISOString(),
+    timestamp,
+    generatedAt: new Date(timestamp).toISOString(),
     version: 3,
     servers: [
       {
@@ -192,18 +206,111 @@ async function mockAutoseedApi(page: Page, counters?: { joinLinkRequests: number
   );
 }
 
+async function mockTestModeAutoseedApi(
+  page: Page,
+  counters: { firstJoinLinkRequests: number; secondJoinLinkRequests: number }
+) {
+  let currentTimestamp = BASE_TIME;
+  const nextTimestamp = () => {
+    currentTimestamp += 1000;
+    return currentTimestamp;
+  };
+
+  await page.route('**/runtime-config.json', (route) => fulfillJson(route, testModeRuntimeConfig));
+  await page.route('**/mock/**/events', (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: 'text/plain; charset=utf-8',
+      body: 'sse unavailable in test'
+    })
+  );
+  await page.route('**/mock/squadjs1/snapshot', (route) =>
+    fulfillJson(
+      route,
+      buildSnapshot({
+        id: 1,
+        code: 'squadjs1',
+        name: '[RU] BSS Classic',
+        playerCount: 24,
+        maxPlayers: 100,
+        queueLength: 0,
+        online: true,
+        timestamp: nextTimestamp()
+      })
+    )
+  );
+  await page.route('**/mock/squadjs2/snapshot', (route) =>
+    fulfillJson(
+      route,
+      buildSnapshot({
+        id: 2,
+        code: 'squadjs2',
+        name: '[RU] BSS Spec Ops',
+        playerCount: 56,
+        maxPlayers: 100,
+        queueLength: 2,
+        online: true,
+        timestamp: nextTimestamp()
+      })
+    )
+  );
+  await page.route('**/mock/squadjs1/join-link', async (route) => {
+    counters.firstJoinLinkRequests += 1;
+    await fulfillJson(route, {
+      ok: true,
+      timestamp: BASE_TIME,
+      serverId: 1,
+      serverCode: 'squadjs1',
+      serverName: '[RU] BSS Classic',
+      joinLink: REDIRECT_TARGET_URL
+    });
+  });
+  await page.route('**/mock/squadjs2/join-link', async (route) => {
+    counters.secondJoinLinkRequests += 1;
+    await fulfillJson(route, {
+      ok: true,
+      timestamp: BASE_TIME,
+      serverId: 2,
+      serverCode: 'squadjs2',
+      serverName: '[RU] BSS Spec Ops',
+      joinLink: REDIRECT_TARGET_URL
+    });
+  });
+  await page.route('**/redirect-target', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'text/html; charset=utf-8',
+      body: '<!doctype html><html><body><main data-testid="redirect-target">Точка перехода</main></body></html>'
+    })
+  );
+}
+
 async function mockSuccessfulPermissionCheck(page: Page) {
   await page.addInitScript(() => {
-    window.open = () =>
-      ({
+    const createPopup = () => {
+      let closed = false;
+
+      return {
         document: {
+          open() {},
           write() {},
           close() {}
         },
-        close() {},
+        location: {
+          href: ''
+        },
+        close() {
+          closed = true;
+        },
         focus() {},
-        closed: false
-      }) as unknown as Window;
+        get closed() {
+          return closed;
+        }
+      };
+    };
+
+    window.open = () =>
+      createPopup() as unknown as Window;
 
     const originalCreateElement = Document.prototype.createElement;
     Document.prototype.createElement = function (
@@ -312,4 +419,28 @@ test('keeps the layout usable on mobile without document-level horizontal overfl
   );
 
   expect(hasNoDocumentOverflow).toBe(true);
+});
+
+test('keeps the pending test sequence and still sends the second transition after a fresh snapshot', async ({
+  page
+}) => {
+  const counters = { firstJoinLinkRequests: 0, secondJoinLinkRequests: 0 };
+  await mockSuccessfulPermissionCheck(page);
+  await mockTestModeAutoseedApi(page, counters);
+
+  await page.goto('/');
+  await page.getByTestId('mode-test').click();
+  await page.getByTestId('check-browser-button').click();
+  await expect(page.getByTestId('check-browser-button')).toContainText('Браузер проверен');
+
+  await page.getByTestId('power-toggle').click();
+  await expect.poll(() => counters.firstJoinLinkRequests).toBe(1);
+  await expect(page.getByText(/^Следующий переход$/)).toBeVisible();
+
+  await page.waitForTimeout(120);
+  await page.getByTestId('refresh-snapshot-button').click();
+  await page.waitForTimeout(120);
+
+  expect(counters.firstJoinLinkRequests).toBe(1);
+  await expect.poll(() => counters.secondJoinLinkRequests).toBe(1);
 });

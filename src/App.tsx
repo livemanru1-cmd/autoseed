@@ -786,6 +786,7 @@ export default function App({ config }: AppProps) {
   const cooldownUntilRef = useRef(cooldownUntil);
   const lastProcessedTimestampRef = useRef(lastProcessedTimestamp);
   const permissionsRef = useRef(permissions);
+  const pendingSequenceRef = useRef(pendingSequence);
   const connectorWindowRef = useRef<Window | null>(null);
   const sequenceTimerRef = useRef<number | null>(null);
   const testSequenceDelayMsRef = useRef<number>(0);
@@ -822,6 +823,10 @@ export default function App({ config }: AppProps) {
   useEffect(() => {
     permissionsRef.current = permissions;
   }, [permissions]);
+
+  useEffect(() => {
+    pendingSequenceRef.current = pendingSequence;
+  }, [pendingSequence]);
 
   useEffect(() => {
     if (!hasConfiguredTestMode && mode !== 'production') {
@@ -982,6 +987,10 @@ export default function App({ config }: AppProps) {
               ? 'Переход отменён: тестовый режим пока не готов.'
               : 'Переход отменён: нет подходящего сервера.'
           );
+          return;
+        }
+
+        if (testModeEnabled && pendingSequenceRef.current?.remaining.length && !options?.forceRedirect) {
           return;
         }
 
